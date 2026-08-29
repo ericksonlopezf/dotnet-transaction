@@ -1,0 +1,37 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/EricksonLopez.Transaction.Abstractions/EricksonLopez.Transaction.Abstractions.csproj" />
+    <Project Path="src/EricksonLopez.Transaction/EricksonLopez.Transaction.csproj" />
+    <Project Path="src/EricksonLopez.Transaction.Dapper/EricksonLopez.Transaction.Dapper.csproj" />
+    <Project Path="src/EricksonLopez.Transaction.PostgreSql/EricksonLopez.Transaction.PostgreSql.csproj" />
+    <Project Path="src/EricksonLopez.Transaction.SqlServer/EricksonLopez.Transaction.SqlServer.csproj" />
+    <Project Path="src/EricksonLopez.Transaction.MySql/EricksonLopez.Transaction.MySql.csproj" />
+    <Project Path="src/EricksonLopez.Transaction.MariaDb/EricksonLopez.Transaction.MariaDb.csproj" />
+    <Project Path="src/EricksonLopez.Transaction.Oracle/EricksonLopez.Transaction.Oracle.csproj" />
+    <Project Path="src/EricksonLopez.Transaction.Sqlite/EricksonLopez.Transaction.Sqlite.csproj" />
+    <Project Path="src/EricksonLopez.Transaction.Result/EricksonLopez.Transaction.Result.csproj" />
+    <Project Path="src/EricksonLopez.Transaction.Testing/EricksonLopez.Transaction.Testing.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/EricksonLopez.Transaction.Abstractions.Tests/EricksonLopez.Transaction.Abstractions.Tests.csproj" />
+    <Project Path="tests/EricksonLopez.Transaction.Tests/EricksonLopez.Transaction.Tests.csproj" />
+    <Project Path="tests/EricksonLopez.Transaction.Dapper.Tests/EricksonLopez.Transaction.Dapper.Tests.csproj" />
+    <Project Path="tests/EricksonLopez.Transaction.PostgreSql.Tests/EricksonLopez.Transaction.PostgreSql.Tests.csproj" />
+    <Project Path="tests/EricksonLopez.Transaction.SqlServer.Tests/EricksonLopez.Transaction.SqlServer.Tests.csproj" />
+    <Project Path="tests/EricksonLopez.Transaction.MySql.Tests/EricksonLopez.Transaction.MySql.Tests.csproj" />
+    <Project Path="tests/EricksonLopez.Transaction.MariaDb.Tests/EricksonLopez.Transaction.MariaDb.Tests.csproj" />
+    <Project Path="tests/EricksonLopez.Transaction.Oracle.Tests/EricksonLopez.Transaction.Oracle.Tests.csproj" />
+    <Project Path="tests/EricksonLopez.Transaction.Sqlite.Tests/EricksonLopez.Transaction.Sqlite.Tests.csproj" />
+    <Project Path="tests/EricksonLopez.Transaction.Result.Tests/EricksonLopez.Transaction.Result.Tests.csproj" />
+    <Project Path="tests/EricksonLopez.Transaction.Testing.Tests/EricksonLopez.Transaction.Testing.Tests.csproj" />
+    <Project Path="tests/EricksonLopez.Transaction.ArchitectureTests/EricksonLopez.Transaction.ArchitectureTests.csproj" />
+    <Project Path="tests/EricksonLopez.Transaction.IntegrationTests/EricksonLopez.Transaction.IntegrationTests.csproj" />
+    <Project Path="tests/EricksonLopez.Transaction.AotSmokeTest/EricksonLopez.Transaction.AotSmokeTest.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/Showcase/EricksonLopez.Transaction.Showcase.csproj" />
+  </Folder>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/EricksonLopez.Transaction.Benchmarks/EricksonLopez.Transaction.Benchmarks.csproj" />
+  </Folder>
+</Solution>

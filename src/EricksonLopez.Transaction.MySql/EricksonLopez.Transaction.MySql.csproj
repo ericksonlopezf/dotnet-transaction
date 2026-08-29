@@ -1,0 +1,23 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <RootNamespace>EricksonLopez.Transaction.MySql</RootNamespace>
+    <AssemblyName>EricksonLopez.Transaction.MySql</AssemblyName>
+    <Description>MySQL connection factory, transaction extensions, and MySQL error code classifier for EricksonLopez.Transaction using MySqlConnector.</Description>
+    <PackageId>EricksonLopez.Transaction.MySql</PackageId>
+    <PackageTags>$(CommonPackageTags);mysql;mysqlconnector;innodb;savepoints;deadlock-detection;database-provider</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EricksonLopez.Transaction.Abstractions\EricksonLopez.Transaction.Abstractions.csproj" />
+    <ProjectReference Include="..\EricksonLopez.Transaction\EricksonLopez.Transaction.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MySqlConnector" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+</Project>

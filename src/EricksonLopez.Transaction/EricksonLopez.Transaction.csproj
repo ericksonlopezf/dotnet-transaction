@@ -1,0 +1,41 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <RootNamespace>EricksonLopez.Transaction</RootNamespace>
+    <AssemblyName>EricksonLopez.Transaction</AssemblyName>
+    <Description>Native AOT-ready enterprise transaction manager, ambient scope coordinator, state machine, and OpenTelemetry instrumentation for modern .NET.</Description>
+    <PackageId>EricksonLopez.Transaction</PackageId>
+    <PackageTags>$(CommonPackageTags);transaction-manager;transaction-scope;ambient-context;savepoints;nested-transactions;opentelemetry;observability;dependency-injection</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EricksonLopez.Transaction.Abstractions\EricksonLopez.Transaction.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="OpenTelemetry.Api" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="EricksonLopez.Transaction.Tests" />
+    <InternalsVisibleTo Include="EricksonLopez.Transaction.Abstractions.Tests" />
+    <InternalsVisibleTo Include="EricksonLopez.Transaction.Dapper.Tests" />
+    <InternalsVisibleTo Include="EricksonLopez.Transaction.PostgreSql.Tests" />
+    <InternalsVisibleTo Include="EricksonLopez.Transaction.SqlServer.Tests" />
+    <InternalsVisibleTo Include="EricksonLopez.Transaction.MySql.Tests" />
+    <InternalsVisibleTo Include="EricksonLopez.Transaction.MariaDb.Tests" />
+    <InternalsVisibleTo Include="EricksonLopez.Transaction.Oracle.Tests" />
+    <InternalsVisibleTo Include="EricksonLopez.Transaction.Sqlite.Tests" />
+    <InternalsVisibleTo Include="EricksonLopez.Transaction.Result.Tests" />
+    <InternalsVisibleTo Include="EricksonLopez.Transaction.Testing.Tests" />
+    <InternalsVisibleTo Include="EricksonLopez.Transaction.IntegrationTests" />
+    <InternalsVisibleTo Include="EricksonLopez.Transaction.Testing" />
+    <InternalsVisibleTo Include="EricksonLopez.Transaction.Benchmarks" />
+  </ItemGroup>
+
+</Project>

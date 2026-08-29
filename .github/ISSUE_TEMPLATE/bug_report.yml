@@ -1,0 +1,46 @@
+name: 🐛 Bug Report
+description: Report a reproducible bug in EricksonLopez.Transaction
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting an issue! Please provide as much detail as possible to help us reproduce and resolve the problem.
+  - type: input
+    id: package-version
+    attributes:
+      label: Package Name and Version
+      description: Which package and version are you using? (e.g., EricksonLopez.Transaction.PostgreSql 1.0.0)
+      placeholder: EricksonLopez.Transaction 1.0.0
+    validations:
+      required: true
+  - type: input
+    id: dotnet-version
+    attributes:
+      label: .NET Runtime Version
+      description: Which .NET SDK / runtime are you using?
+      placeholder: .NET 10.0.100 (Linux / Windows / macOS)
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps or Code to Reproduce
+      description: Minimal reproduction steps or code snippet.
+      render: csharp
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true

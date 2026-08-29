@@ -1,0 +1,38 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>EricksonLopez.Transaction.Showcase</RootNamespace>
+    <AssemblyName>EricksonLopez.Transaction.Showcase</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <IsAotCompatible>false</IsAotCompatible>
+    <EnableTrimAnalyzer>false</EnableTrimAnalyzer>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.Abstractions\EricksonLopez.Transaction.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction\EricksonLopez.Transaction.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.Dapper\EricksonLopez.Transaction.Dapper.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.Result\EricksonLopez.Transaction.Result.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.Testing\EricksonLopez.Transaction.Testing.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.PostgreSql\EricksonLopez.Transaction.PostgreSql.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.SqlServer\EricksonLopez.Transaction.SqlServer.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.MySql\EricksonLopez.Transaction.MySql.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.MariaDb\EricksonLopez.Transaction.MariaDb.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.Oracle\EricksonLopez.Transaction.Oracle.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.Sqlite\EricksonLopez.Transaction.Sqlite.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="OpenTelemetry.Api" />
+    <PackageReference Include="Dapper" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+  </ItemGroup>
+
+</Project>
