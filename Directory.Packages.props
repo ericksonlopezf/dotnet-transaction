@@ -20,7 +20,7 @@
     <PackageVersion Include="Npgsql" Version="10.0.3" />
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="5.2.2" />
     <PackageVersion Include="MySqlConnector" Version="2.4.0" />
-    <PackageVersion Include="Oracle.ManagedDataAccess.Core" Version="23.7.0" />
+    <PackageVersion Include="Oracle.ManagedDataAccess.Core" Version="23.26.300" />
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.3" />
 
     <!-- Testing & Benchmarks -->
