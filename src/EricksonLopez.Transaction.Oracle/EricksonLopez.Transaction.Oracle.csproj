@@ -1,0 +1,23 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <RootNamespace>EricksonLopez.Transaction.Oracle</RootNamespace>
+    <AssemblyName>EricksonLopez.Transaction.Oracle</AssemblyName>
+    <Description>Oracle Database connection factory, transaction extensions, and Oracle error code classifier for EricksonLopez.Transaction using Oracle.ManagedDataAccess.Core.</Description>
+    <PackageId>EricksonLopez.Transaction.Oracle</PackageId>
+    <PackageTags>$(CommonPackageTags);oracle;oracledb;oracle-manageddataaccess;savepoints;deadlock-detection;database-provider</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EricksonLopez.Transaction.Abstractions\EricksonLopez.Transaction.Abstractions.csproj" />
+    <ProjectReference Include="..\EricksonLopez.Transaction\EricksonLopez.Transaction.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Oracle.ManagedDataAccess.Core" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+</Project>

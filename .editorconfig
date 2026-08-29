@@ -1,0 +1,115 @@
+# Copyright © Erickson Lopez. MIT License.
+root = true
+
+# All files
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# Markdown files
+[*.md]
+indent_size = 2
+trim_trailing_whitespace = false
+
+# XML / Props / Targets files
+[*.{csproj,props,targets,xml}]
+indent_size = 2
+
+# JSON files
+[*.json]
+indent_size = 2
+
+# C# Source Code
+[*.cs]
+# File Header
+file_header_template = Copyright © Erickson Lopez. MIT License.
+
+# Code Style & Organization
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = false:suggestion
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_expression_bodied_constructors = when_on_single_line:suggestion
+csharp_style_expression_bodied_properties = true:suggestion
+csharp_style_expression_bodied_accessors = true:suggestion
+csharp_style_pattern_matching = true:suggestion
+csharp_style_throw_expression = true:suggestion
+csharp_style_conditional_delegate_call = true:suggestion
+csharp_style_prefer_null_check_over_type_check = true:suggestion
+
+# Roslyn Diagnostic Rules & Severity
+# CS0618 & CS0619: Zero tolerance for obsolete member invocations
+dotnet_diagnostic.CS0618.severity = error
+dotnet_diagnostic.CS0619.severity = error
+
+# CS1591: Missing XML documentation for public visible types
+dotnet_diagnostic.CS1591.severity = error
+
+# CS0159 / CS159: No such label in scope
+dotnet_diagnostic.CS0159.severity = error
+
+# IDE1006: Naming rule violations
+dotnet_diagnostic.IDE1006.severity = warning
+
+# CA1707: Identifiers should not contain underscores
+dotnet_diagnostic.CA1707.severity = warning
+
+# CA1852: Seal internal types
+dotnet_diagnostic.CA1852.severity = warning
+
+# CA1305: Specify IFormatProvider
+dotnet_diagnostic.CA1305.severity = suggestion
+
+# xUnit Rules
+dotnet_diagnostic.xUnit1051.severity = warning
+
+# Naming Conventions Configuration
+dotnet_naming_rule.interface_should_be_begins_with_i.symbols = interface_symbols
+dotnet_naming_rule.interface_should_be_begins_with_i.style = begins_with_i
+dotnet_naming_rule.interface_should_be_begins_with_i.severity = warning
+
+dotnet_naming_symbols.interface_symbols.applicable_kinds = interface
+dotnet_naming_symbols.interface_symbols.applicable_accessibilities = *
+
+dotnet_naming_style.begins_with_i.required_prefix = I
+dotnet_naming_style.begins_with_i.capitalization = pascal_case
+
+dotnet_naming_rule.types_should_be_pascal_case.symbols = type_symbols
+dotnet_naming_rule.types_should_be_pascal_case.style = pascal_case
+dotnet_naming_rule.types_should_be_pascal_case.severity = warning
+
+dotnet_naming_symbols.type_symbols.applicable_kinds = class, struct, enum, delegate
+dotnet_naming_symbols.type_symbols.applicable_accessibilities = *
+
+dotnet_naming_style.pascal_case.capitalization = pascal_case
+
+dotnet_naming_rule.parameters_should_be_camel_case.symbols = parameter_symbols
+dotnet_naming_rule.parameters_should_be_camel_case.style = camel_case
+dotnet_naming_rule.parameters_should_be_camel_case.severity = warning
+
+dotnet_naming_symbols.parameter_symbols.applicable_kinds = parameter
+dotnet_naming_symbols.parameter_symbols.applicable_accessibilities = *
+
+dotnet_naming_style.camel_case.capitalization = camel_case
+
+# Test Projects, Samples, and Benchmarks Overrides
+[{tests,samples,benchmarks}/**/*.cs]
+# Allow underscore in test method naming convention (e.g. Method_WhenScenario_ShouldResult)
+dotnet_diagnostic.CA1707.severity = none
+# Internal test helpers or fixtures do not strictly require sealing
+dotnet_diagnostic.CA1852.severity = none
+# Test and benchmark methods do not require XML documentation comments
+dotnet_diagnostic.CS1591.severity = none
+# Allow non-static test methods/assertions
+dotnet_diagnostic.CA1822.severity = none
+# Allow public types in test assemblies
+dotnet_diagnostic.CA1515.severity = none
+# Allow interface parameter/variable allocations in tests
+dotnet_diagnostic.CA1859.severity = none

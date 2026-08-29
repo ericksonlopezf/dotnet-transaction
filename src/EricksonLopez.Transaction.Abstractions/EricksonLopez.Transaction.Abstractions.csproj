@@ -1,0 +1,13 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <RootNamespace>EricksonLopez.Transaction</RootNamespace>
+    <AssemblyName>EricksonLopez.Transaction.Abstractions</AssemblyName>
+    <Description>Core abstractions, interfaces, options, and primitives for EricksonLopez.Transaction.</Description>
+    <PackageId>EricksonLopez.Transaction.Abstractions</PackageId>
+    <PackageTags>$(CommonPackageTags);abstractions;interfaces;savepoints;transaction-scope;nested-transactions;isolation-levels;ambient-context</PackageTags>
+  </PropertyGroup>
+
+</Project>

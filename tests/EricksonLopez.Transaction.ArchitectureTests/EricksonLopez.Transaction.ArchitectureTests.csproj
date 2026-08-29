@@ -1,0 +1,37 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>EricksonLopez.Transaction.ArchitectureTests</RootNamespace>
+    <AssemblyName>EricksonLopez.Transaction.ArchitectureTests</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <IsAotCompatible>false</IsAotCompatible>
+    <EnableTrimAnalyzer>false</EnableTrimAnalyzer>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.Abstractions\EricksonLopez.Transaction.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction\EricksonLopez.Transaction.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.Dapper\EricksonLopez.Transaction.Dapper.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.PostgreSql\EricksonLopez.Transaction.PostgreSql.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.SqlServer\EricksonLopez.Transaction.SqlServer.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.MySql\EricksonLopez.Transaction.MySql.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.MariaDb\EricksonLopez.Transaction.MariaDb.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.Oracle\EricksonLopez.Transaction.Oracle.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.Sqlite\EricksonLopez.Transaction.Sqlite.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.Result\EricksonLopez.Transaction.Result.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.Testing\EricksonLopez.Transaction.Testing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="NetArchTest.Rules" />
+    <PackageReference Include="coverlet.collector" />
+  </ItemGroup>
+
+</Project>
