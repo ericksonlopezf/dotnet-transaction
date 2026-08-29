@@ -1,0 +1,27 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>EricksonLopez.Transaction.Benchmarks</RootNamespace>
+    <AssemblyName>EricksonLopez.Transaction.Benchmarks</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <IsAotCompatible>false</IsAotCompatible>
+    <EnableTrimAnalyzer>false</EnableTrimAnalyzer>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.Abstractions\EricksonLopez.Transaction.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction\EricksonLopez.Transaction.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.Dapper\EricksonLopez.Transaction.Dapper.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.Testing\EricksonLopez.Transaction.Testing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+  </ItemGroup>
+
+</Project>

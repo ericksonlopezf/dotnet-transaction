@@ -1,0 +1,21 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <RootNamespace>EricksonLopez.Transaction.PostgreSql</RootNamespace>
+    <AssemblyName>EricksonLopez.Transaction.PostgreSql</AssemblyName>
+    <Description>PostgreSQL provider adapters, error classifiers, and savepoint handlers for EricksonLopez.Transaction.</Description>
+    <PackageId>EricksonLopez.Transaction.PostgreSql</PackageId>
+    <PackageTags>$(CommonPackageTags);postgresql;postgres;npgsql;savepoints;sqlstate;deadlock-detection;database-provider</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EricksonLopez.Transaction\EricksonLopez.Transaction.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql" />
+  </ItemGroup>
+
+</Project>

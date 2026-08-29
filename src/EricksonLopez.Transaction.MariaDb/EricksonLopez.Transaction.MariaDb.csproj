@@ -1,0 +1,23 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <RootNamespace>EricksonLopez.Transaction.MariaDb</RootNamespace>
+    <AssemblyName>EricksonLopez.Transaction.MariaDb</AssemblyName>
+    <Description>MariaDB connection factory, transaction extensions, and MariaDB error code classifier for EricksonLopez.Transaction using MySqlConnector.</Description>
+    <PackageId>EricksonLopez.Transaction.MariaDb</PackageId>
+    <PackageTags>$(CommonPackageTags);mariadb;mysqlconnector;savepoints;deadlock-detection;database-provider</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EricksonLopez.Transaction.Abstractions\EricksonLopez.Transaction.Abstractions.csproj" />
+    <ProjectReference Include="..\EricksonLopez.Transaction\EricksonLopez.Transaction.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MySqlConnector" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+</Project>

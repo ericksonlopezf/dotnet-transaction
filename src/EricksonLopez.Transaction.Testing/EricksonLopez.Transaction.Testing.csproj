@@ -1,0 +1,17 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <RootNamespace>EricksonLopez.Transaction.Testing</RootNamespace>
+    <AssemblyName>EricksonLopez.Transaction.Testing</AssemblyName>
+    <Description>Testing utilities, fake transaction managers, spy contexts, and chaos simulators for EricksonLopez.Transaction.</Description>
+    <PackageId>EricksonLopez.Transaction.Testing</PackageId>
+    <PackageTags>$(CommonPackageTags);testing;test-doubles;fakes;mocks;unit-testing;in-memory</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EricksonLopez.Transaction.Abstractions\EricksonLopez.Transaction.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

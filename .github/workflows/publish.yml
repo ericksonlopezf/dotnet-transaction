@@ -1,0 +1,105 @@
+# Copyright © Erickson Lopez. MIT License.
+name: Publish Packages
+
+on:
+  release:
+    types: [ published ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (e.g. 1.2.3 — without 'v' prefix)"
+        required: false
+        type: string
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  # ─── Job 1: Verify Stryker Mutation Quality Gate on main ────────────────────
+  mutation-gate-check:
+    name: Verify Mutation Quality Gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      statuses: read
+      actions: read
+    outputs:
+      needs_stryker: ${{ steps.check.outputs.needs_stryker }}
+      can_proceed: ${{ steps.check.outputs.can_proceed }}
+      evaluated_commit: ${{ steps.check.outputs.evaluated_commit }}
+      mutation_score: ${{ steps.check.outputs.mutation_score }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Evaluate Mutation Quality Gate on main
+        id: check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const verifyMutationGate = require('./scripts/verify-mutation-gate.js');
+            await verifyMutationGate({ github, context, core });
+
+  # ─── Job 2: Conditional Stryker Execution if needed ────────────────────────
+  stryker-gate:
+    name: Run Stryker Mutation Gate (Conditional)
+    needs: mutation-gate-check
+    if: needs.mutation-gate-check.outputs.needs_stryker == 'true'
+    permissions:
+      contents: read
+      statuses: write
+      actions: read
+    uses: ./.github/workflows/mutation-testing.yml
+    with:
+      mutation-level: "Standard"
+
+  # ─── Job 3: Publish to NuGet (Strict Quality Gate Required) ────────────────
+  publish:
+    name: Pack & Push to NuGet
+    needs: [mutation-gate-check, stryker-gate]
+    if: |
+      always() &&
+      (needs.mutation-gate-check.result == 'success') &&
+      (
+        (needs.mutation-gate-check.outputs.needs_stryker == 'false' && needs.mutation-gate-check.outputs.can_proceed == 'true') ||
+        (needs.mutation-gate-check.outputs.needs_stryker == 'true' && needs.stryker-gate.result == 'success')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      statuses: read
+      actions: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore Strong Name key
+        env:
+          SNK_KEY: ${{ secrets.SNK_KEY }}
+        run: |
+          if [ -n "$SNK_KEY" ]; then
+            echo "$SNK_KEY" | tr -d '\n\r ' | base64 --decode > EricksonLopez.snk
+          fi
+
+      - name: Pack Packages
+        run: dotnet pack EricksonLopez.Transaction.slnx -c Release -o ./artifacts
+
+      - name: Push to NuGet
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          if [ -n "$NUGET_API_KEY" ]; then
+            dotnet nuget push "./artifacts/*.nupkg" --api-key "$NUGET_API_KEY" --source "https://api.nuget.org/v3/index.json" --skip-duplicate
+          fi

@@ -1,0 +1,21 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <RootNamespace>EricksonLopez.Transaction</RootNamespace>
+    <AssemblyName>EricksonLopez.Transaction.Result</AssemblyName>
+    <Description>Seamless integration between EricksonLopez.Transaction and EricksonLopez.Result monad with automatic failure rollback.</Description>
+    <PackageId>EricksonLopez.Transaction.Result</PackageId>
+    <PackageTags>$(CommonPackageTags);result;result-pattern;functional-programming;railway-oriented-programming;error-handling;automatic-rollback</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EricksonLopez.Transaction.Abstractions\EricksonLopez.Transaction.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="EricksonLopez.Result" />
+  </ItemGroup>
+
+</Project>
