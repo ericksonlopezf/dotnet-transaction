@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <AssemblyName>EricksonLopez.Transaction.Mediator</AssemblyName>
+    <RootNamespace>EricksonLopez.Transaction.Mediator</RootNamespace>
+    <PackageId>EricksonLopez.Transaction.Mediator</PackageId>
+    <Description>Enterprise mediator pipeline behavior for EricksonLopez.Transaction. Automatically coordinates database transaction lifecycles, committing on success and rolling back on functional failure (Result.IsFailure) or unhandled exceptions.</Description>
+    <PackageTags>$(CommonPackageTags);mediator;pipeline;cqrs;transactions;result-pattern;unit-of-work</PackageTags>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EricksonLopez.Transaction.Abstractions\EricksonLopez.Transaction.Abstractions.csproj" />
+    <ProjectReference Include="..\EricksonLopez.Transaction.Result\EricksonLopez.Transaction.Result.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="EricksonLopez.Mediator" />
+    <PackageReference Include="EricksonLopez.Result" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="EricksonLopez.Transaction.Mediator.Tests" />
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+  </ItemGroup>
+
+</Project>

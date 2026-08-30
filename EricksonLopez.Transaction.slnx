@@ -10,6 +10,7 @@
     <Project Path="src/EricksonLopez.Transaction.Oracle/EricksonLopez.Transaction.Oracle.csproj" />
     <Project Path="src/EricksonLopez.Transaction.Sqlite/EricksonLopez.Transaction.Sqlite.csproj" />
     <Project Path="src/EricksonLopez.Transaction.Result/EricksonLopez.Transaction.Result.csproj" />
+    <Project Path="src/EricksonLopez.Transaction.Mediator/EricksonLopez.Transaction.Mediator.csproj" />
     <Project Path="src/EricksonLopez.Transaction.Testing/EricksonLopez.Transaction.Testing.csproj" />
   </Folder>
   <Folder Name="/tests/">
@@ -23,6 +24,7 @@
     <Project Path="tests/EricksonLopez.Transaction.Oracle.Tests/EricksonLopez.Transaction.Oracle.Tests.csproj" />
     <Project Path="tests/EricksonLopez.Transaction.Sqlite.Tests/EricksonLopez.Transaction.Sqlite.Tests.csproj" />
     <Project Path="tests/EricksonLopez.Transaction.Result.Tests/EricksonLopez.Transaction.Result.Tests.csproj" />
+    <Project Path="tests/EricksonLopez.Transaction.Mediator.Tests/EricksonLopez.Transaction.Mediator.Tests.csproj" />
     <Project Path="tests/EricksonLopez.Transaction.Testing.Tests/EricksonLopez.Transaction.Testing.Tests.csproj" />
     <Project Path="tests/EricksonLopez.Transaction.ArchitectureTests/EricksonLopez.Transaction.ArchitectureTests.csproj" />
     <Project Path="tests/EricksonLopez.Transaction.IntegrationTests/EricksonLopez.Transaction.IntegrationTests.csproj" />
