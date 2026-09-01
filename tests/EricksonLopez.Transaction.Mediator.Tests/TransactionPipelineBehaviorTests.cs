@@ -78,4 +78,25 @@ public sealed class TransactionPipelineBehaviorTests
         await _transaction.Received(1).RollbackAsync(Arg.Any<CancellationToken>());
         await _transaction.DidNotReceive().CommitAsync(Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task Handle_WithEnlistments_EnlistsAllParticipantsIntoContext()
+    {
+        var context = Substitute.For<ITransactionContext>();
+        _transaction.Context.Returns(context);
+
+        var enlistment1 = Substitute.For<ITransactionEnlistment>();
+        var enlistment2 = Substitute.For<ITransactionEnlistment>();
+        var enlistments = new[] { enlistment1, enlistment2 };
+
+        var behavior = new TransactionPipelineBehavior<TestTransactionalCommand, ResultInstance>(_transactionManager, enlistments);
+        var request = new TestTransactionalCommand("CreateInvoice");
+        var next = new TestNextContinuation<ResultInstance>(() => ValueTask.FromResult(ResultInstance.Success()));
+
+        var result = await behavior.Handle(request, next, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        context.Received(1).Enlist(enlistment1);
+        context.Received(1).Enlist(enlistment2);
+    }
 }

@@ -6,6 +6,12 @@ namespace EricksonLopez.Transaction.Mediator;
 /// <summary>
 /// Specifies transactional requirements, isolation level, and timeout for a mediator command.
 /// </summary>
+/// <remarks>
+/// This attribute is no longer inspected by <see cref="TransactionPipelineBehavior{TRequest, TResponse}"/>
+/// as of the AOT-safety refactoring. Implement <see cref="ITransactionalCommandOptions"/> on your command
+/// to specify custom transaction options without reflection.
+/// </remarks>
+[Obsolete("Use ITransactionalCommandOptions interface instead. This attribute requires reflection and is incompatible with Native AOT trimming.", error: false)]
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, Inherited = true, AllowMultiple = false)]
 public sealed class TransactionalAttribute : Attribute
 {

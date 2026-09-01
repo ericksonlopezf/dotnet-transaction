@@ -1,6 +1,6 @@
 // Copyright © Erickson Lopez. MIT License.
 using System;
-using System.Reflection;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using EricksonLopez.Mediator;
@@ -18,27 +18,23 @@ namespace EricksonLopez.Transaction.Mediator;
 public sealed class TransactionPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
 {
     private static readonly bool IsTransactional =
-        typeof(ITransactionalCommand).IsAssignableFrom(typeof(TRequest)) ||
-        typeof(TRequest).GetCustomAttribute<TransactionalAttribute>(inherit: true) is not null;
+        typeof(ITransactionalCommand).IsAssignableFrom(typeof(TRequest));
 
-    private static readonly TransactionOptions? ConfiguredOptions =
-        typeof(TRequest).GetCustomAttribute<TransactionalAttribute>(inherit: true) is { } attr
-            ? new TransactionOptions
-            {
-                IsolationLevel = attr.IsolationLevel,
-                Timeout = attr.TimeoutSeconds > 0 ? TimeSpan.FromSeconds(attr.TimeoutSeconds) : null
-            }
-            : null;
 
     private readonly ITransactionManager _transactionManager;
+    private readonly IEnumerable<ITransactionEnlistment> _enlistments;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TransactionPipelineBehavior{TRequest, TResponse}"/> class.
     /// </summary>
     /// <param name="transactionManager">The transaction manager instance.</param>
-    public TransactionPipelineBehavior(ITransactionManager transactionManager)
+    /// <param name="enlistments">Optional collection of transaction enlistment lifecycle participants.</param>
+    public TransactionPipelineBehavior(
+        ITransactionManager transactionManager,
+        IEnumerable<ITransactionEnlistment>? enlistments = null)
     {
         _transactionManager = transactionManager ?? throw new ArgumentNullException(nameof(transactionManager));
+        _enlistments = enlistments ?? [];
     }
 
     /// <inheritdoc />
@@ -53,9 +49,18 @@ public sealed class TransactionPipelineBehavior<TRequest, TResponse> : IPipeline
             return await next.InvokeAsync().ConfigureAwait(false);
         }
 
+        var options = request is ITransactionalCommandOptions configurable
+            ? configurable.TransactionOptions
+            : null;
+
         await using var transaction = await _transactionManager
-            .BeginAsync(ConfiguredOptions, cancellationToken)
+            .BeginAsync(options, cancellationToken)
             .ConfigureAwait(false);
+
+        foreach (var enlistment in _enlistments)
+        {
+            transaction.Context.Enlist(enlistment);
+        }
 
         TResponse response;
         try
