@@ -10,11 +10,11 @@ Job=ShortRun  IterationCount=3  LaunchCount=1
 WarmupCount=3  
 
 ```
-| Method                            | Mean     | Error     | StdDev    | Ratio | RatioSD | Gen0   | Gen1   | Allocated | Alloc Ratio |
-|---------------------------------- |---------:|----------:|----------:|------:|--------:|-------:|-------:|----------:|------------:|
-| DirectDbTransactionBenchmark      | 7.459 μs | 0.4518 μs | 0.0248 μs |  1.00 |    0.00 | 0.0992 | 0.0916 |   1.65 KB |        1.00 |
-| FrameworkTransactionBenchmark     |       NA |        NA |        NA |     ? |       ? |     NA |     NA |        NA |           ? |
-| FrameworkNestedSavepointBenchmark |       NA |        NA |        NA |     ? |       ? |     NA |     NA |        NA |           ? |
+| Method                            | Mean     | Error    | StdDev    | Ratio | RatioSD | Gen0   | Gen1   | Allocated | Alloc Ratio |
+|---------------------------------- |---------:|---------:|----------:|------:|--------:|-------:|-------:|----------:|------------:|
+| DirectDbTransactionBenchmark      | 7.698 μs | 1.405 μs | 0.0770 μs |  1.00 |    0.01 | 0.0992 | 0.0916 |   1.65 KB |        1.00 |
+| FrameworkTransactionBenchmark     |       NA |       NA |        NA |     ? |       ? |     NA |     NA |        NA |           ? |
+| FrameworkNestedSavepointBenchmark |       NA |       NA |        NA |     ? |       ? |     NA |     NA |        NA |           ? |
 
 Benchmarks with issues:
   TransactionBenchmarks.FrameworkTransactionBenchmark: ShortRun(IterationCount=3, LaunchCount=1, WarmupCount=3)
