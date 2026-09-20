@@ -2,7 +2,7 @@
 <html lang='en'>
 <head>
 <meta charset='utf-8' />
-<title>EricksonLopez.Transaction.Benchmarks.TransactionBenchmarks-20260913-071537</title>
+<title>EricksonLopez.Transaction.Benchmarks.TransactionBenchmarks-20260920-073225</title>
 
 <style type="text/css">
 	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
@@ -14,10 +14,10 @@
 <body>
 <pre><code>
 BenchmarkDotNet v0.15.8, Linux Ubuntu 24.04.5 LTS (Noble Numbat)
-Intel Xeon Platinum 8370C CPU 2.80GHz, 1 CPU, 4 logical and 2 physical cores
+AMD EPYC 7763 2.45GHz, 1 CPU, 4 logical and 2 physical cores
 .NET SDK 10.0.401
-  [Host]   : .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v4
-  ShortRun : .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v4
+  [Host]   : .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
+  ShortRun : .NET 10.0.12 (10.0.12, 10.0.1226.42308), X64 RyuJIT x86-64-v3
 </code></pre>
 <pre><code>Job=ShortRun  IterationCount=3  LaunchCount=1  
 WarmupCount=3  
@@ -26,7 +26,7 @@ WarmupCount=3
 <table>
 <thead><tr><th>Method                     </th><th>Mean</th><th>Error</th><th>StdDev</th><th>Ratio</th><th>RatioSD</th><th>Gen0</th><th>Gen1</th><th>Allocated</th><th>Alloc Ratio</th>
 </tr>
-</thead><tbody><tr><td>DirectDbTransactionBenchmark</td><td>7.286 &mu;s</td><td>0.2357 &mu;s</td><td>0.0129 &mu;s</td><td>1.00</td><td>0.00</td><td>0.0610</td><td>0.0534</td><td>1.65 KB</td><td>1.00</td>
+</thead><tbody><tr><td>DirectDbTransactionBenchmark</td><td>7.451 &mu;s</td><td>0.6686 &mu;s</td><td>0.0366 &mu;s</td><td>1.00</td><td>0.01</td><td>0.0992</td><td>0.0916</td><td>1.65 KB</td><td>1.00</td>
 </tr><tr><td>FrameworkTransactionBenchmark</td><td>NA</td><td>NA</td><td>NA</td><td>?</td><td>?</td><td>NA</td><td>NA</td><td>NA</td><td>?</td>
 </tr><tr><td>FrameworkNestedSavepointBenchmark</td><td>NA</td><td>NA</td><td>NA</td><td>?</td><td>?</td><td>NA</td><td>NA</td><td>NA</td><td>?</td>
 </tr></tbody></table>
