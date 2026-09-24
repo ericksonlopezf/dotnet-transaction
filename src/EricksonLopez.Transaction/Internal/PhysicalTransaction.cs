@@ -22,6 +22,7 @@ internal sealed class PhysicalTransaction : ITransaction
     private readonly long _startTimestamp;
     private readonly Activity? _activity;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private const string OutcomeTag = "transaction.outcome";
     private int _disposed;
 
     public PhysicalTransaction(
@@ -112,7 +113,7 @@ internal sealed class PhysicalTransaction : ITransaction
 
                 double elapsedMs = Stopwatch.GetElapsedTime(_startTimestamp).TotalMilliseconds;
                 TransactionDiagnostics.RecordCommitted(_context.IsolationLevel, elapsedMs);
-                _activity?.SetTag("transaction.outcome", "committed");
+                _activity?.SetTag(OutcomeTag, "committed");
                 _activity?.SetStatus(ActivityStatusCode.Ok);
             }
             catch (TransactionStateException)
@@ -126,7 +127,7 @@ internal sealed class PhysicalTransaction : ITransaction
                 {
                     double elapsedMs = Stopwatch.GetElapsedTime(_startTimestamp).TotalMilliseconds;
                     TransactionDiagnostics.RecordFailed(_context.IsolationLevel, elapsedMs, ex.GetType().Name);
-                    _activity?.SetTag("transaction.outcome", "failed");
+                    _activity?.SetTag(OutcomeTag, "failed");
                     _activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
 
                     await _context.ExecuteOnExceptionHooksAsync(ex, CancellationToken.None).ConfigureAwait(false);
@@ -144,7 +145,7 @@ internal sealed class PhysicalTransaction : ITransaction
 
                 double elapsedMs = Stopwatch.GetElapsedTime(_startTimestamp).TotalMilliseconds;
                 TransactionDiagnostics.RecordFailed(_context.IsolationLevel, elapsedMs, ex.GetType().Name);
-                _activity?.SetTag("transaction.outcome", "failed");
+                _activity?.SetTag(OutcomeTag, "failed");
                 _activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
 
                 await _context.ExecuteOnExceptionHooksAsync(ex, CancellationToken.None).ConfigureAwait(false);
@@ -223,7 +224,7 @@ internal sealed class PhysicalTransaction : ITransaction
 
             double elapsedMs = Stopwatch.GetElapsedTime(_startTimestamp).TotalMilliseconds;
             TransactionDiagnostics.RecordRolledBack(_context.IsolationLevel, elapsedMs);
-            _activity?.SetTag("transaction.outcome", "rolled_back");
+            _activity?.SetTag(OutcomeTag, "rolled_back");
 
             await _context.ExecuteAfterRollbackHooksAsync(combinedToken).ConfigureAwait(false);
         }
@@ -281,7 +282,7 @@ internal sealed class PhysicalTransaction : ITransaction
         }
 
         // Wait for any active commit/rollback/savepoint in progress to finish cleanly before tearing down resources
-        await _gate.WaitAsync().ConfigureAwait(false);
+        await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
         try
         {
             _activity?.Dispose();
@@ -301,7 +302,7 @@ internal sealed class PhysicalTransaction : ITransaction
 
                     double elapsedMs = Stopwatch.GetElapsedTime(_startTimestamp).TotalMilliseconds;
                     TransactionDiagnostics.RecordFailed(_context.IsolationLevel, elapsedMs, ex.GetType().Name);
-                    _activity?.SetTag("transaction.outcome", "failed");
+                    _activity?.SetTag(OutcomeTag, "failed");
                     _activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
 
                     await _context.ExecuteOnExceptionHooksAsync(ex, CancellationToken.None).ConfigureAwait(false);
@@ -313,7 +314,7 @@ internal sealed class PhysicalTransaction : ITransaction
                     {
                         try
                         {
-                            _connection.Close();
+                            await _connection.CloseAsync().ConfigureAwait(false);
                         }
                         catch
                         {

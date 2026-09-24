@@ -10,8 +10,7 @@ namespace EricksonLopez.Transaction.PostgreSql.Tests;
 
 public class PostgreSqlErrorClassifierIntegrationTests : IAsyncLifetime
     {
-        private readonly PostgreSqlContainer _postgreSqlContainer = new PostgreSqlBuilder()
-            .WithImage("postgres:15-alpine")
+        private readonly PostgreSqlContainer _postgreSqlContainer = new PostgreSqlBuilder("postgres:15-alpine")
             .Build();
 
         public async Task InitializeAsync()
