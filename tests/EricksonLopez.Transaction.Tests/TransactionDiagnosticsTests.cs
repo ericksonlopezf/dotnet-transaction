@@ -86,6 +86,34 @@ public sealed class TransactionDiagnosticsTests
     }
 
     [Fact]
+    public void StartActivity_WithSanitizeTelemetryMetadata_ShouldRedactIdAndName()
+    {
+        var txId = Guid.NewGuid();
+
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == TransactionDiagnostics.SourceName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData
+        };
+
+        ActivitySource.AddActivityListener(listener);
+
+        Activity? activity = TransactionDiagnostics.StartActivity(
+            "Transaction.Sanitized",
+            txId,
+            TransactionIsolationLevel.Unspecified,
+            "SensitiveOperationName",
+            sanitizeTelemetryMetadata: true);
+
+        activity.Should().NotBeNull();
+        activity!.TagObjects.First(t => t.Key == "transaction.id").Value.Should().Be("[REDACTED]");
+        activity.TagObjects.First(t => t.Key == "transaction.name").Value.Should().Be("[REDACTED]");
+        activity.TagObjects.First(t => t.Key == "transaction.isolation_level").Value.Should().Be("Unspecified");
+
+        activity.Dispose();
+    }
+
+    [Fact]
     public void Instruments_UnitsAndDescriptions_ShouldMatch()
     {
         var published = new Dictionary<string, (string? Unit, string? Description)>();

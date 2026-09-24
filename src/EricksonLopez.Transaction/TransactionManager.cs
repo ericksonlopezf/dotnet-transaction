@@ -158,8 +158,6 @@ public sealed partial class TransactionManager : ITransactionManager
         }
 
         bool wasSuppressed = effectiveOptions.NestedBehavior == NestedTransactionBehavior.Suppress;
-        bool previousSuppressed = IsSuppressedHolder.Value;
-        ITransactionContext? previousAmbient = AmbientContextHolder.Value;
 
         try
         {
@@ -185,14 +183,6 @@ public sealed partial class TransactionManager : ITransactionManager
             }
 
             throw new TransactionTimeoutException(effectiveOptions.Timeout!.Value);
-        }
-        finally
-        {
-            if (wasSuppressed)
-            {
-                IsSuppressedHolder.Value = previousSuppressed;
-                AmbientContextHolder.Value = previousAmbient;
-            }
         }
     }
 
@@ -267,8 +257,6 @@ public sealed partial class TransactionManager : ITransactionManager
         }
 
         bool wasSuppressed = effectiveOptions.NestedBehavior == NestedTransactionBehavior.Suppress;
-        bool previousSuppressed = IsSuppressedHolder.Value;
-        ITransactionContext? previousAmbient = AmbientContextHolder.Value;
 
         try
         {
@@ -295,14 +283,6 @@ public sealed partial class TransactionManager : ITransactionManager
             }
 
             throw new TransactionTimeoutException(effectiveOptions.Timeout!.Value);
-        }
-        finally
-        {
-            if (wasSuppressed)
-            {
-                IsSuppressedHolder.Value = previousSuppressed;
-                AmbientContextHolder.Value = previousAmbient;
-            }
         }
     }
 

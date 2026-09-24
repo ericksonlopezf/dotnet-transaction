@@ -58,12 +58,34 @@ public sealed class ScopesTests
         await innerTx.Received(1).DisposeAsync();
         holder.Value.Should().BeSameAs(previousContext);
 
+        Func<Task> commitAct = () => scope.CommitAsync();
+        Func<Task> rollbackAct = () => scope.RollbackAsync();
+        Func<Task> spAct = () => scope.CreateSavepointAsync("sp1");
+        await commitAct.Should().ThrowAsync<ObjectDisposedException>();
+        await rollbackAct.Should().ThrowAsync<ObjectDisposedException>();
+        await spAct.Should().ThrowAsync<ObjectDisposedException>();
+
         // Second dispose should be a complete no-op (idempotent, innerTx.DisposeAsync called only once, holder not overwritten)
         var otherContext = Substitute.For<ITransactionContext>();
         holder.Value = otherContext;
         await scope.DisposeAsync();
         await innerTx.Received(1).DisposeAsync();
         holder.Value.Should().BeSameAs(otherContext);
+    }
+
+    [Fact]
+    public async Task AmbientTransactionScope_WhenOnDisposedProvided_ShouldInvokeCallbackOnDispose()
+    {
+        var holder = new AsyncLocal<ITransactionContext?>();
+        var innerTx = Substitute.For<ITransaction>();
+        innerTx.Context.Returns(Substitute.For<ITransactionContext>());
+
+        bool callbackInvoked = false;
+        var scope = new AmbientTransactionScope(innerTx, null, holder, onDisposed: () => callbackInvoked = true);
+
+        callbackInvoked.Should().BeFalse();
+        await scope.DisposeAsync();
+        callbackInvoked.Should().BeTrue();
     }
 
     private sealed class ThrowingDisposeTransaction : ITransaction
@@ -140,6 +162,7 @@ public sealed class ScopesTests
 
         await scope.RollbackAsync();
         scope.State.Should().Be(TransactionState.RolledBack);
+        parentContext.Received(1).SetRollbackOnly("Inner JoinExisting scope rolled back.");
 
         await scope.DisposeAsync();
         scope.State.Should().Be(TransactionState.RolledBack);
@@ -158,6 +181,7 @@ public sealed class ScopesTests
         scope.State.Should().Be(TransactionState.Active);
         await scope.DisposeAsync();
         scope.State.Should().Be(TransactionState.Disposed);
+        parentContext.Received(1).SetRollbackOnly("Inner JoinExisting scope disposed without committing.");
 
         // Idempotent second dispose
         await scope.DisposeAsync();
@@ -306,5 +330,26 @@ public sealed class ScopesTests
         await commitAct.Should().ThrowAsync<ObjectDisposedException>();
         await rollbackAct.Should().ThrowAsync<ObjectDisposedException>();
         await savepointAct.Should().ThrowAsync<ObjectDisposedException>();
+    }
+
+    [Fact]
+    public async Task SuppressedTransactionScope_ShouldManageSuppressionFlagAndInvokeOnDisposed()
+    {
+        var holder = new AsyncLocal<ITransactionContext?>();
+        var previousContext = Substitute.For<ITransactionContext>();
+        holder.Value = previousContext;
+
+        bool onDisposedInvoked = false;
+        var scope = new SuppressedTransactionScope(previousContext, holder, onDisposed: () => onDisposedInvoked = true);
+
+        TransactionManager.IsSuppressedHolder.Value.Should().BeTrue();
+        holder.Value.Should().BeNull();
+        onDisposedInvoked.Should().BeFalse();
+
+        await scope.DisposeAsync();
+
+        onDisposedInvoked.Should().BeTrue();
+        TransactionManager.IsSuppressedHolder.Value.Should().BeFalse();
+        holder.Value.Should().BeSameAs(previousContext);
     }
 }

@@ -860,4 +860,78 @@ public sealed class TransactionManagerTests
 
         await act.Should().NotThrowAsync();
     }
+
+    [Fact]
+    public async Task CurrentContext_WhenSuppressed_ShouldReturnNullEvenIfAmbientContextExists()
+    {
+        var manager = new TransactionManager(_connectionFactory);
+
+        manager.CurrentContext.Should().BeNull();
+
+        await manager.ExecuteAsync(async () =>
+        {
+            manager.CurrentContext.Should().NotBeNull();
+
+            TransactionManager.IsSuppressedHolder.Value = true;
+            try
+            {
+                manager.CurrentContext.Should().BeNull();
+            }
+            finally
+            {
+                TransactionManager.IsSuppressedHolder.Value = false;
+            }
+
+            manager.CurrentContext.Should().NotBeNull();
+        });
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Action_WithSuppressNestedBehavior_ShouldManageSuppressionAndRestoreContext()
+    {
+        var manager = new TransactionManager(_connectionFactory);
+
+        await manager.ExecuteAsync(async () =>
+        {
+            var outerContext = manager.CurrentContext;
+            outerContext.Should().NotBeNull();
+
+            bool executed = false;
+            await manager.ExecuteAsync(async () =>
+            {
+                executed = true;
+                manager.CurrentContext.Should().BeNull();
+                TransactionManager.IsSuppressedHolder.Value.Should().BeTrue();
+                await Task.CompletedTask;
+            }, new TransactionOptions { NestedBehavior = NestedTransactionBehavior.Suppress });
+
+            executed.Should().BeTrue();
+            manager.CurrentContext.Should().BeSameAs(outerContext);
+            TransactionManager.IsSuppressedHolder.Value.Should().BeFalse();
+        });
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Function_WithSuppressNestedBehavior_ShouldManageSuppressionAndRestoreContext()
+    {
+        var manager = new TransactionManager(_connectionFactory);
+
+        await manager.ExecuteAsync(async () =>
+        {
+            var outerContext = manager.CurrentContext;
+            outerContext.Should().NotBeNull();
+
+            int result = await manager.ExecuteAsync(async () =>
+            {
+                manager.CurrentContext.Should().BeNull();
+                TransactionManager.IsSuppressedHolder.Value.Should().BeTrue();
+                await Task.CompletedTask;
+                return 999;
+            }, new TransactionOptions { NestedBehavior = NestedTransactionBehavior.Suppress });
+
+            result.Should().Be(999);
+            manager.CurrentContext.Should().BeSameAs(outerContext);
+            TransactionManager.IsSuppressedHolder.Value.Should().BeFalse();
+        });
+    }
 }

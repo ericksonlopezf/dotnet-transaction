@@ -79,6 +79,19 @@ namespace EricksonLopez.Transaction.Tests
         }
 
         [Fact]
+        public void OracleDialect_CanHandle_CoversIndexBoundary()
+        {
+            var dialect = new OracleDialect();
+            using var indexZero = new Oracle.ManagedDataAccess.Client.OracleTestClientConnection();
+            using var indexPositive = new Custom.Oracle.Driver.OracleDriverConnection();
+            using var notOracle = new DummyConnection();
+
+            dialect.CanHandle(indexZero).Should().BeTrue();
+            dialect.CanHandle(indexPositive).Should().BeTrue();
+            dialect.CanHandle(notOracle).Should().BeFalse();
+        }
+
+        [Fact]
         public async Task OracleDialect_ApplyReadOnlyModeAsync_ShouldExecuteSetTransactionReadOnly()
         {
             var dialect = new OracleDialect();
@@ -90,6 +103,123 @@ namespace EricksonLopez.Transaction.Tests
             conn.LastCreatedCommand.Should().NotBeNull();
             conn.LastCreatedCommand!.CommandText.Should().Be("SET TRANSACTION READ ONLY;");
             conn.LastCreatedCommand.Transaction.Should().BeSameAs(tx);
+        }
+
+        [Fact]
+        public async Task GenericSqlDialect_Methods_ShouldBehaveCorrectly()
+        {
+            var dialect = GenericSqlDialect.Instance;
+            using var conn = new DummyConnection();
+            using var tx = new FakeDbTransaction(conn);
+
+            dialect.CanHandle(conn).Should().BeTrue();
+            await dialect.ApplyReadOnlyModeAsync(conn, tx, CancellationToken.None);
+            dialect.GetSavepointCreationSql("sp1").Should().Be("SAVEPOINT sp1;");
+            dialect.GetSavepointRollbackSql("sp1").Should().Be("ROLLBACK TO SAVEPOINT sp1;");
+            dialect.GetSavepointReleaseSql("sp1").Should().Be("RELEASE SAVEPOINT sp1;");
+        }
+
+        [Fact]
+        public async Task MySqlDialect_Methods_ShouldBehaveCorrectly()
+        {
+            var dialect = new MySqlDialect();
+            using var connConnector = new MySqlConnector.MySqlConnectorConnection();
+            using var connClassic = new MySql.Data.MySqlClient.MySqlClientConnection();
+            using var dummyConn = new DummyConnection();
+
+            dialect.CanHandle(connConnector).Should().BeTrue();
+            dialect.CanHandle(connClassic).Should().BeTrue();
+            dialect.CanHandle(dummyConn).Should().BeFalse();
+
+            dialect.GetSavepointCreationSql("sp1").Should().Be("SAVEPOINT sp1;");
+            dialect.GetSavepointRollbackSql("sp1").Should().Be("ROLLBACK TO SAVEPOINT sp1;");
+            dialect.GetSavepointReleaseSql("sp1").Should().Be("RELEASE SAVEPOINT sp1;");
+
+            using var fakeConn = new OracleFakeConnection();
+            using var tx = new FakeDbTransaction(fakeConn);
+            await dialect.ApplyReadOnlyModeAsync(fakeConn, tx, CancellationToken.None);
+            fakeConn.LastCreatedCommand.Should().NotBeNull();
+            fakeConn.LastCreatedCommand!.CommandText.Should().Be("SET TRANSACTION READ ONLY;");
+        }
+
+        [Fact]
+        public void OracleDialect_CanHandle_ShouldRecognizeAllMatchingNamespaces()
+        {
+            var dialect = new OracleDialect();
+            using var connManaged = new Oracle.ManagedDataAccess.Client.OracleTestClientConnection();
+            using var connOther = new Oracle.Other.OracleOtherConnection();
+            using var connCustom = new Custom.Oracle.Driver.OracleDriverConnection();
+            using var dummy = new DummyConnection();
+
+            dialect.CanHandle(connManaged).Should().BeTrue();
+            dialect.CanHandle(connOther).Should().BeTrue();
+            dialect.CanHandle(connCustom).Should().BeTrue();
+            dialect.CanHandle(dummy).Should().BeFalse();
+        }
+
+        [Fact]
+        public async Task PostgreSqlDialect_Methods_ShouldBehaveCorrectly()
+        {
+            var dialect = new PostgreSqlDialect();
+            using var connNpgsql = new Npgsql.NpgsqlTestConnection();
+            using var dummy = new DummyConnection();
+
+            dialect.CanHandle(connNpgsql).Should().BeTrue();
+            dialect.CanHandle(dummy).Should().BeFalse();
+
+            dialect.GetSavepointCreationSql("sp1").Should().Be("SAVEPOINT sp1;");
+            dialect.GetSavepointRollbackSql("sp1").Should().Be("ROLLBACK TO SAVEPOINT sp1;");
+            dialect.GetSavepointReleaseSql("sp1").Should().Be("RELEASE SAVEPOINT sp1;");
+
+            using var fakeConn = new OracleFakeConnection();
+            using var tx = new FakeDbTransaction(fakeConn);
+            await dialect.ApplyReadOnlyModeAsync(fakeConn, tx, CancellationToken.None);
+            fakeConn.LastCreatedCommand.Should().NotBeNull();
+            fakeConn.LastCreatedCommand!.CommandText.Should().Be("SET TRANSACTION READ ONLY;");
+        }
+
+        [Fact]
+        public async Task SqliteDialect_Methods_ShouldBehaveCorrectly()
+        {
+            var dialect = new SqliteDialect();
+            using var connMs = new Microsoft.Data.Sqlite.SqliteMsConnection();
+            using var connSys = new System.Data.SQLite.SqliteSysConnection();
+            using var dummy = new DummyConnection();
+
+            dialect.CanHandle(connMs).Should().BeTrue();
+            dialect.CanHandle(connSys).Should().BeTrue();
+            dialect.CanHandle(dummy).Should().BeFalse();
+
+            dialect.GetSavepointCreationSql("sp1").Should().Be("SAVEPOINT sp1;");
+            dialect.GetSavepointRollbackSql("sp1").Should().Be("ROLLBACK TO SAVEPOINT sp1;");
+            dialect.GetSavepointReleaseSql("sp1").Should().Be("RELEASE SAVEPOINT sp1;");
+
+            using var tx = new FakeDbTransaction(dummy);
+            var task = dialect.ApplyReadOnlyModeAsync(dummy, tx, CancellationToken.None);
+            task.IsCompletedSuccessfully.Should().BeTrue();
+            await task;
+        }
+
+        [Fact]
+        public async Task SqlServerDialect_Methods_ShouldBehaveCorrectly()
+        {
+            var dialect = new SqlServerDialect();
+            using var connMs = new Microsoft.Data.SqlClient.SqlMsConnection();
+            using var connSys = new System.Data.SqlClient.SqlSysConnection();
+            using var dummy = new DummyConnection();
+
+            dialect.CanHandle(connMs).Should().BeTrue();
+            dialect.CanHandle(connSys).Should().BeTrue();
+            dialect.CanHandle(dummy).Should().BeFalse();
+
+            dialect.GetSavepointCreationSql("sp1").Should().Be("SAVE TRANSACTION sp1;");
+            dialect.GetSavepointRollbackSql("sp1").Should().Be("ROLLBACK TRANSACTION sp1;");
+            dialect.GetSavepointReleaseSql("sp1").Should().BeNull();
+
+            using var tx = new FakeDbTransaction(dummy);
+            var task = dialect.ApplyReadOnlyModeAsync(dummy, tx, CancellationToken.None);
+            task.IsCompletedSuccessfully.Should().BeTrue();
+            await task;
         }
 
         private sealed class DummyConnection : DbConnection
@@ -169,6 +299,168 @@ namespace Oracle.ManagedDataAccess.Client
         public override string Database => "ORCL";
         public override string DataSource => "localhost";
         public override string ServerVersion => "19.0";
+        public override ConnectionState State => ConnectionState.Open;
+        public override void ChangeDatabase(string databaseName) { }
+        public override void Close() { }
+        public override void Open() { }
+        protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel) => throw new NotSupportedException();
+        protected override DbCommand CreateDbCommand() => throw new NotSupportedException();
+    }
+}
+
+namespace Oracle.Other
+{
+    internal sealed class OracleOtherConnection : DbConnection
+    {
+        [AllowNull]
+        public override string ConnectionString { get; set; } = string.Empty;
+        public override string Database => "ORCL";
+        public override string DataSource => "localhost";
+        public override string ServerVersion => "19.0";
+        public override ConnectionState State => ConnectionState.Open;
+        public override void ChangeDatabase(string databaseName) { }
+        public override void Close() { }
+        public override void Open() { }
+        protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel) => throw new NotSupportedException();
+        protected override DbCommand CreateDbCommand() => throw new NotSupportedException();
+    }
+}
+
+namespace Custom.Oracle.Driver
+{
+    internal sealed class OracleDriverConnection : DbConnection
+    {
+        [AllowNull]
+        public override string ConnectionString { get; set; } = string.Empty;
+        public override string Database => "ORCL";
+        public override string DataSource => "localhost";
+        public override string ServerVersion => "19.0";
+        public override ConnectionState State => ConnectionState.Open;
+        public override void ChangeDatabase(string databaseName) { }
+        public override void Close() { }
+        public override void Open() { }
+        protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel) => throw new NotSupportedException();
+        protected override DbCommand CreateDbCommand() => throw new NotSupportedException();
+    }
+}
+
+namespace MySqlConnector
+{
+    internal sealed class MySqlConnectorConnection : DbConnection
+    {
+        [AllowNull]
+        public override string ConnectionString { get; set; } = string.Empty;
+        public override string Database => "db";
+        public override string DataSource => "localhost";
+        public override string ServerVersion => "8.0";
+        public override ConnectionState State => ConnectionState.Open;
+        public override void ChangeDatabase(string databaseName) { }
+        public override void Close() { }
+        public override void Open() { }
+        protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel) => throw new NotSupportedException();
+        protected override DbCommand CreateDbCommand() => throw new NotSupportedException();
+    }
+}
+
+namespace MySql.Data.MySqlClient
+{
+    internal sealed class MySqlClientConnection : DbConnection
+    {
+        [AllowNull]
+        public override string ConnectionString { get; set; } = string.Empty;
+        public override string Database => "db";
+        public override string DataSource => "localhost";
+        public override string ServerVersion => "8.0";
+        public override ConnectionState State => ConnectionState.Open;
+        public override void ChangeDatabase(string databaseName) { }
+        public override void Close() { }
+        public override void Open() { }
+        protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel) => throw new NotSupportedException();
+        protected override DbCommand CreateDbCommand() => throw new NotSupportedException();
+    }
+}
+
+namespace Npgsql
+{
+    internal sealed class NpgsqlTestConnection : DbConnection
+    {
+        [AllowNull]
+        public override string ConnectionString { get; set; } = string.Empty;
+        public override string Database => "pg";
+        public override string DataSource => "localhost";
+        public override string ServerVersion => "16.0";
+        public override ConnectionState State => ConnectionState.Open;
+        public override void ChangeDatabase(string databaseName) { }
+        public override void Close() { }
+        public override void Open() { }
+        protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel) => throw new NotSupportedException();
+        protected override DbCommand CreateDbCommand() => throw new NotSupportedException();
+    }
+}
+
+namespace Microsoft.Data.Sqlite
+{
+    internal sealed class SqliteMsConnection : DbConnection
+    {
+        [AllowNull]
+        public override string ConnectionString { get; set; } = string.Empty;
+        public override string Database => "main";
+        public override string DataSource => "memory";
+        public override string ServerVersion => "3.0";
+        public override ConnectionState State => ConnectionState.Open;
+        public override void ChangeDatabase(string databaseName) { }
+        public override void Close() { }
+        public override void Open() { }
+        protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel) => throw new NotSupportedException();
+        protected override DbCommand CreateDbCommand() => throw new NotSupportedException();
+    }
+}
+
+namespace System.Data.SQLite
+{
+    internal sealed class SqliteSysConnection : DbConnection
+    {
+        [AllowNull]
+        public override string ConnectionString { get; set; } = string.Empty;
+        public override string Database => "main";
+        public override string DataSource => "memory";
+        public override string ServerVersion => "3.0";
+        public override ConnectionState State => ConnectionState.Open;
+        public override void ChangeDatabase(string databaseName) { }
+        public override void Close() { }
+        public override void Open() { }
+        protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel) => throw new NotSupportedException();
+        protected override DbCommand CreateDbCommand() => throw new NotSupportedException();
+    }
+}
+
+namespace Microsoft.Data.SqlClient
+{
+    internal sealed class SqlMsConnection : DbConnection
+    {
+        [AllowNull]
+        public override string ConnectionString { get; set; } = string.Empty;
+        public override string Database => "master";
+        public override string DataSource => "localhost";
+        public override string ServerVersion => "16.0";
+        public override ConnectionState State => ConnectionState.Open;
+        public override void ChangeDatabase(string databaseName) { }
+        public override void Close() { }
+        public override void Open() { }
+        protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel) => throw new NotSupportedException();
+        protected override DbCommand CreateDbCommand() => throw new NotSupportedException();
+    }
+}
+
+namespace System.Data.SqlClient
+{
+    internal sealed class SqlSysConnection : DbConnection
+    {
+        [AllowNull]
+        public override string ConnectionString { get; set; } = string.Empty;
+        public override string Database => "master";
+        public override string DataSource => "localhost";
+        public override string ServerVersion => "16.0";
         public override ConnectionState State => ConnectionState.Open;
         public override void ChangeDatabase(string databaseName) { }
         public override void Close() { }

@@ -138,4 +138,28 @@ public sealed class FakeTransactionTests
         await tx2.DisposeAsync();
         tx2.State.Should().Be(TransactionState.RolledBack);
     }
+
+    [Fact]
+    public void FakeTransactionContext_SetRollbackOnly_SetsIsRollbackOnlyToTrue()
+    {
+        var context = new FakeTransactionContext();
+        context.IsRollbackOnly.Should().BeFalse();
+        context.SetRollbackOnly("reason");
+        context.IsRollbackOnly.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task FakeTransaction_OperationsAfterDispose_ShouldThrowObjectDisposedException()
+    {
+        var tx = new FakeTransaction();
+        await tx.DisposeAsync();
+
+        Func<Task> commitAct = () => tx.CommitAsync();
+        Func<Task> rollbackAct = () => tx.RollbackAsync();
+        Func<Task> spAct = () => tx.CreateSavepointAsync("sp");
+
+        await commitAct.Should().ThrowAsync<ObjectDisposedException>();
+        await rollbackAct.Should().ThrowAsync<ObjectDisposedException>();
+        await spAct.Should().ThrowAsync<ObjectDisposedException>();
+    }
 }

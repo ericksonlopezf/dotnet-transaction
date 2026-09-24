@@ -186,4 +186,140 @@ public sealed class TransactionResultExtensionsTests
         fakeManager.StartedTransactions[0].CommitCount.Should().Be(0);
         fakeManager.StartedTransactions[0].RollbackCount.Should().Be(1);
     }
+
+    [Fact]
+    public async Task ExecuteResultAsync_NonGeneric_WhenTimeoutExpires_ShouldThrowTransactionTimeoutException()
+    {
+        var fakeManager = new FakeTransactionManager();
+        var options = new TransactionOptions { Timeout = TimeSpan.FromMilliseconds(50) };
+
+        Func<Task> act = () => fakeManager.ExecuteResultAsync(async context =>
+        {
+            await Task.Delay(500, context.CancellationToken);
+            return ResultInstance.Success();
+        }, options);
+
+        await act.Should().ThrowAsync<Exceptions.TransactionTimeoutException>();
+    }
+
+    [Fact]
+    public async Task ExecuteResultAsync_Generic_WhenTimeoutExpires_ShouldThrowTransactionTimeoutException()
+    {
+        var fakeManager = new FakeTransactionManager();
+        var options = new TransactionOptions { Timeout = TimeSpan.FromMilliseconds(50) };
+
+        Func<Task> act = () => fakeManager.ExecuteResultAsync<int>(async context =>
+        {
+            await Task.Delay(500, context.CancellationToken);
+            return Result<int>.Success(42);
+        }, options);
+
+        await act.Should().ThrowAsync<Exceptions.TransactionTimeoutException>();
+    }
+
+    [Fact]
+    public async Task ExecuteResultAsync_NonGeneric_WhenExternalTokenCancelled_ShouldThrowOperationCanceledException()
+    {
+        var fakeManager = new FakeTransactionManager();
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var options = new TransactionOptions { Timeout = TimeSpan.FromSeconds(10) };
+
+        Func<Task> act = () => fakeManager.ExecuteResultAsync(async context =>
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+            return ResultInstance.Success();
+        }, options, cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task ExecuteResultAsync_Generic_WhenExternalTokenCancelled_ShouldThrowOperationCanceledException()
+    {
+        var fakeManager = new FakeTransactionManager();
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var options = new TransactionOptions { Timeout = TimeSpan.FromSeconds(10) };
+
+        Func<Task> act = () => fakeManager.ExecuteResultAsync<int>(async context =>
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+            return Result<int>.Success(42);
+        }, options, cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task ExecuteResultAsync_WithOptionsAndExternalToken_PassesCombinedTokenAndCustomOptions()
+    {
+        var fakeManager = new FakeTransactionManager();
+        using var cts = new CancellationTokenSource();
+        var options = new TransactionOptions
+        {
+            IsolationLevel = TransactionIsolationLevel.Serializable,
+            Timeout = TimeSpan.FromSeconds(30)
+        };
+
+        var result = await fakeManager.ExecuteResultAsync(async context =>
+        {
+            context.CancellationToken.CanBeCanceled.Should().BeTrue();
+            return ResultInstance.Success();
+        }, options, cts.Token);
+
+        result.IsSuccess.Should().BeTrue();
+        fakeManager.StartedTransactions[0].Context.IsolationLevel.Should().Be(TransactionIsolationLevel.Serializable);
+    }
+
+    [Fact]
+    public async Task ExecuteResultAsync_Generic_WithOptionsAndExternalToken_PassesCombinedTokenAndCustomOptions()
+    {
+        var fakeManager = new FakeTransactionManager();
+        using var cts = new CancellationTokenSource();
+        var options = new TransactionOptions
+        {
+            IsolationLevel = TransactionIsolationLevel.Serializable,
+            Timeout = TimeSpan.FromSeconds(30)
+        };
+
+        var result = await fakeManager.ExecuteResultAsync<int>(async context =>
+        {
+            context.CancellationToken.CanBeCanceled.Should().BeTrue();
+            return Result<int>.Success(123);
+        }, options, cts.Token);
+
+        result.IsSuccess.Should().BeTrue();
+        fakeManager.StartedTransactions[0].Context.IsolationLevel.Should().Be(TransactionIsolationLevel.Serializable);
+    }
+
+    [Fact]
+    public async Task ExecuteResultAsync_NonGeneric_WhenOperationThrowsOperationCanceledExceptionWithoutTimeoutOrCallerCancellation_ShouldRethrowDirectly()
+    {
+        var fakeManager = new FakeTransactionManager();
+        var options = new TransactionOptions { Timeout = TimeSpan.FromMinutes(5) };
+
+        Func<Task> act = () => fakeManager.ExecuteResultAsync(async context =>
+        {
+            await Task.Yield();
+            throw new OperationCanceledException();
+        }, options, CancellationToken.None);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task ExecuteResultAsync_Generic_WhenOperationThrowsOperationCanceledExceptionWithoutTimeoutOrCallerCancellation_ShouldRethrowDirectly()
+    {
+        var fakeManager = new FakeTransactionManager();
+        var options = new TransactionOptions { Timeout = TimeSpan.FromMinutes(5) };
+
+        Func<Task> act = () => fakeManager.ExecuteResultAsync<int>(async context =>
+        {
+            await Task.Yield();
+            throw new OperationCanceledException();
+        }, options, CancellationToken.None);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
 }

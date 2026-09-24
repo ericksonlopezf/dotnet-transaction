@@ -57,17 +57,15 @@ internal sealed class JoinExistingTransactionScope : ITransaction
     /// <inheritdoc/>
     public ValueTask DisposeAsync()
     {
-        if (_disposed)
+        if (!_disposed)
         {
-            return ValueTask.CompletedTask;
-        }
+            _disposed = true;
 
-        _disposed = true;
-
-        if (_stateMachine.CurrentState == TransactionState.Active)
-        {
-            _parentContext.SetRollbackOnly("Inner JoinExisting scope disposed without committing.");
-            _stateMachine.TransitionToDisposed();
+            if (_stateMachine.CurrentState == TransactionState.Active)
+            {
+                _parentContext.SetRollbackOnly("Inner JoinExisting scope disposed without committing.");
+                _stateMachine.TransitionToDisposed();
+            }
         }
 
         return ValueTask.CompletedTask;

@@ -58,7 +58,7 @@ public sealed class TransactionPipelineBehavior<TRequest, TResponse> : IPipeline
             }
         }
 
-        TResponse response;
+        TResponse response = default!;
         try
         {
             response = await next.InvokeAsync().ConfigureAwait(false);

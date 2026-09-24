@@ -11,6 +11,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using EricksonLopez.Transaction.Diagnostics;
+using EricksonLopez.Transaction.Dialects;
 using EricksonLopez.Transaction.Exceptions;
 using EricksonLopez.Transaction.Internal;
 using NSubstitute;
@@ -257,6 +258,141 @@ public sealed class PhysicalTransactionTests : IDisposable
     }
 
     [Fact]
+    public async Task CommitAsync_WhenContextIsRollbackOnly_ShouldRollbackAndThrowTransactionCommitException()
+    {
+        _context.SetRollbackOnly("Triggered by test");
+        var tx = new PhysicalTransaction(_context, _stateMachine, _connection, _transaction, ownsConnection: true);
+
+        Func<Task> act = () => tx.CommitAsync(CancellationToken.None);
+
+        var ex = await act.Should().ThrowAsync<TransactionCommitException>();
+        ex.Which.Message.Should().Contain("cannot be committed because it was marked rollback-only by an inner scope.");
+        await _transaction.Received(1).RollbackAsync(Arg.Any<CancellationToken>());
+        await _transaction.DidNotReceive().CommitAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CommitAsync_WhenCanceledAfterDispatch_ShouldThrowAmbiguousCommitException()
+    {
+        Activity? captured = null;
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == TransactionDiagnostics.SourceName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+            ActivityStarted = a => captured = a
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        _transaction.When(t => t.CommitAsync(Arg.Any<CancellationToken>()))
+            .Do(_ => throw new OperationCanceledException("Timed out at server"));
+
+        var tx = new PhysicalTransaction(_context, _stateMachine, _connection, _transaction, ownsConnection: true);
+
+        Func<Task> act = () => tx.CommitAsync(CancellationToken.None);
+
+        var ex = await act.Should().ThrowAsync<TransactionCommitException>();
+        ex.Which.IsAmbiguous.Should().BeTrue();
+        ex.Which.Message.Should().Contain("The operation was canceled after the commit was dispatched");
+        tx.State.Should().Be(TransactionState.Failed);
+
+        captured.Should().NotBeNull();
+        captured!.Status.Should().Be(ActivityStatusCode.Error);
+        captured.StatusDescription.Should().Be("Timed out at server");
+        captured.TagObjects.First(t => t.Key == "transaction.outcome").Value.Should().Be("failed");
+    }
+
+    [Fact]
+    public async Task CommitAsync_WhenCanceledBeforeDispatch_ShouldRethrowDirectly()
+    {
+        var hook = Substitute.For<ITransactionEnlistment>();
+        hook.When(h => h.BeforeCommitAsync(Arg.Any<ITransactionContext>(), Arg.Any<CancellationToken>()))
+            .Do(_ => throw new OperationCanceledException());
+        _context.Enlist(hook);
+
+        var tx = new PhysicalTransaction(_context, _stateMachine, _connection, _transaction, ownsConnection: true);
+
+        Func<Task> act = () => tx.CommitAsync(CancellationToken.None);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        tx.State.Should().Be(TransactionState.Failed);
+        await _transaction.DidNotReceive().CommitAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CommitAsync_WhenAfterCommitHookFails_ShouldThrowTransactionPostCommitException()
+    {
+        Activity? captured = null;
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == TransactionDiagnostics.SourceName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+            ActivityStarted = a => captured = a
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        var hook = Substitute.For<ITransactionEnlistment>();
+        hook.When(h => h.AfterCommitAsync(Arg.Any<ITransactionContext>(), Arg.Any<CancellationToken>()))
+            .Do(_ => throw new InvalidOperationException("Hook failed"));
+        _context.Enlist(hook);
+
+        var tx = new PhysicalTransaction(_context, _stateMachine, _connection, _transaction, ownsConnection: true);
+
+        Func<Task> act = () => tx.CommitAsync(CancellationToken.None);
+
+        var ex = await act.Should().ThrowAsync<TransactionPostCommitException>();
+        ex.Which.Message.Should().Contain("was committed successfully, but one or more post-commit hooks failed.");
+
+        captured.Should().NotBeNull();
+        captured!.Status.Should().Be(ActivityStatusCode.Error);
+        captured.StatusDescription.Should().Be("Hook failed");
+    }
+
+    [Fact]
+    public async Task CommitAsync_WhenStateNotActive_ShouldThrowTransactionStateException()
+    {
+        var machine = new TransactionStateMachine(TransactionState.Created);
+        var context = new TransactionContext(Guid.NewGuid(), _connection, _transaction, TransactionIsolationLevel.ReadCommitted, machine, GenericSqlDialect.Instance, CancellationToken.None);
+        var tx = new PhysicalTransaction(context, machine, _connection, _transaction, ownsConnection: true);
+
+        Func<Task> act = () => tx.CommitAsync(CancellationToken.None);
+
+        var ex = await act.Should().ThrowAsync<TransactionStateException>();
+        ex.Which.AttemptedOperation.Should().Be("Commit");
+        await _transaction.DidNotReceive().CommitAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CreateSavepointAsync_WhenStateNotActive_ShouldThrowTransactionStateException()
+    {
+        var machine = new TransactionStateMachine(TransactionState.RolledBack);
+        var context = new TransactionContext(Guid.NewGuid(), _connection, _transaction, TransactionIsolationLevel.ReadCommitted, machine, GenericSqlDialect.Instance, CancellationToken.None);
+        var tx = new PhysicalTransaction(context, machine, _connection, _transaction, ownsConnection: true);
+
+        Func<Task> act = () => tx.CreateSavepointAsync("sp1", CancellationToken.None);
+
+        var ex = await act.Should().ThrowAsync<TransactionStateException>();
+        ex.Which.AttemptedOperation.Should().Be("CreateSavepoint");
+    }
+
+    [Fact]
+    public async Task DisposeAsync_WhenRollbackThrowsAndDoesNotOwnConnection_ShouldCloseConnectionToPreventPoolContamination()
+    {
+        var hook = Substitute.For<ITransactionEnlistment>();
+        _context.Enlist(hook);
+
+        var rollbackException = new InvalidOperationException("DB error on rollback");
+        _transaction.When(t => t.RollbackAsync(Arg.Any<CancellationToken>()))
+            .Do(_ => throw rollbackException);
+
+        var tx = new PhysicalTransaction(_context, _stateMachine, _connection, _transaction, ownsConnection: false);
+
+        await tx.DisposeAsync();
+
+        await _connection.Received(1).CloseAsync();
+        await hook.Received(1).OnExceptionAsync(_context, rollbackException, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task RollbackAsync_ShouldInvokeHooksAndTransitionToRolledBack()
     {
         var hook = Substitute.For<ITransactionEnlistment>();
@@ -278,6 +414,22 @@ public sealed class PhysicalTransactionTests : IDisposable
         tx.State.Should().Be(TransactionState.RolledBack);
         await hook.Received(1).AfterRollbackAsync(_context, Arg.Any<CancellationToken>());
         recorded.Should().Contain("transactions.rolled_back");
+    }
+
+    [Fact]
+    public async Task RollbackAsync_WhenAlreadyRolledBack_ShouldBeNoOp()
+    {
+        var hook = Substitute.For<ITransactionEnlistment>();
+        _context.Enlist(hook);
+
+        var tx = new PhysicalTransaction(_context, _stateMachine, _connection, _transaction, ownsConnection: true);
+
+        await tx.RollbackAsync(CancellationToken.None);
+        await tx.RollbackAsync(CancellationToken.None);
+
+        tx.State.Should().Be(TransactionState.RolledBack);
+        await _transaction.Received(1).RollbackAsync(Arg.Any<CancellationToken>());
+        await hook.Received(1).AfterRollbackAsync(_context, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -400,15 +552,48 @@ public sealed class PhysicalTransactionTests : IDisposable
     [Fact]
     public async Task DisposeAsync_WhenRollbackThrows_ShouldSwallowSilently()
     {
+        TransactionState capturedStateInHook = TransactionState.Created;
+        var hook = Substitute.For<ITransactionEnlistment>();
+        hook.When(h => h.OnExceptionAsync(Arg.Any<ITransactionContext>(), Arg.Any<InvalidOperationException>(), Arg.Any<CancellationToken>()))
+            .Do(call => capturedStateInHook = ((ITransactionContext)call[0]).State);
+        _context.Enlist(hook);
+
+        var recorded = new List<string>();
+        using var meterListener = new MeterListener();
+        meterListener.InstrumentPublished = (instrument, listener) =>
+        {
+            if (instrument.Meter.Name == TransactionDiagnostics.SourceName) listener.EnableMeasurementEvents(instrument);
+        };
+        meterListener.SetMeasurementEventCallback<long>((inst, val, tags, state) => recorded.Add(inst.Name));
+        meterListener.Start();
+
+        Activity? stoppedActivity = null;
+        using var activityListener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == TransactionDiagnostics.SourceName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = act => stoppedActivity = act
+        };
+        ActivitySource.AddActivityListener(activityListener);
+
         _transaction.When(t => t.RollbackAsync(Arg.Any<CancellationToken>()))
             .Do(_ => throw new InvalidOperationException("Network failure during rollback on dispose"));
 
-        var tx = new PhysicalTransaction(_context, _stateMachine, _connection, _transaction, ownsConnection: true);
+        var tx = new PhysicalTransaction(_context, _stateMachine, _connection, _transaction, ownsConnection: false);
 
         Func<Task> act = async () => await tx.DisposeAsync();
 
         await act.Should().NotThrowAsync();
         tx.State.Should().Be(TransactionState.Disposed);
+        tx.GateCurrentCount.Should().Be(1);
+        await hook.Received(1).OnExceptionAsync(_context, Arg.Any<InvalidOperationException>(), Arg.Any<CancellationToken>());
+        await _connection.Received(1).CloseAsync();
+        recorded.Should().Contain("transactions.failed");
+        capturedStateInHook.Should().Be(TransactionState.Failed);
+        stoppedActivity.Should().NotBeNull();
+        stoppedActivity!.GetTagItem("transaction.outcome").Should().Be("failed");
+        stoppedActivity.Status.Should().Be(ActivityStatusCode.Error);
+        stoppedActivity.StatusDescription.Should().Be("Network failure during rollback on dispose");
     }
 
     [Fact]
@@ -425,6 +610,7 @@ public sealed class PhysicalTransactionTests : IDisposable
 
         await act.Should().NotThrowAsync();
         tx.State.Should().Be(TransactionState.Disposed);
+        tx.GateCurrentCount.Should().Be(1);
     }
 
     [Fact]
@@ -441,5 +627,77 @@ public sealed class PhysicalTransactionTests : IDisposable
         await commitAct.Should().ThrowAsync<ObjectDisposedException>();
         await rollbackAct.Should().ThrowAsync<ObjectDisposedException>();
         await savepointAct.Should().ThrowAsync<ObjectDisposedException>();
+    }
+
+    [Fact]
+    public async Task CommitAsync_WhenTokenCanceledBeforeWait_ShouldTransitionToFailedAndThrow()
+    {
+        var tx = new PhysicalTransaction(_context, _stateMachine, _connection, _transaction, ownsConnection: true);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Func<Task> act = () => tx.CommitAsync(cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        tx.State.Should().Be(TransactionState.Failed);
+        tx.GateCurrentCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task CommitAsync_WhenCanceledAfterDispatch_ShouldRecordFailedAndThrowAmbiguousException()
+    {
+        var hook = Substitute.For<ITransactionEnlistment>();
+        _context.Enlist(hook);
+
+        var recorded = new List<string>();
+        using var meterListener = new MeterListener();
+        meterListener.InstrumentPublished = (instrument, listener) =>
+        {
+            if (instrument.Meter.Name == TransactionDiagnostics.SourceName) listener.EnableMeasurementEvents(instrument);
+        };
+        meterListener.SetMeasurementEventCallback<long>((inst, val, tags, state) => recorded.Add(inst.Name));
+        meterListener.Start();
+
+        Activity? stoppedActivity = null;
+        using var activityListener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == TransactionDiagnostics.SourceName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = act => stoppedActivity = act
+        };
+        ActivitySource.AddActivityListener(activityListener);
+
+        _transaction.When(t => t.CommitAsync(Arg.Any<CancellationToken>()))
+            .Do(_ => throw new OperationCanceledException("Commit cancellation timeout"));
+
+        var tx = new PhysicalTransaction(_context, _stateMachine, _connection, _transaction, ownsConnection: true);
+
+        Func<Task> act = () => tx.CommitAsync(CancellationToken.None);
+
+        var ex = await act.Should().ThrowAsync<TransactionCommitException>();
+        ex.Which.IsAmbiguous.Should().BeTrue();
+        tx.State.Should().Be(TransactionState.Failed);
+        tx.GateCurrentCount.Should().Be(1);
+        await hook.Received(1).OnExceptionAsync(_context, Arg.Any<OperationCanceledException>(), Arg.Any<CancellationToken>());
+        recorded.Should().Contain("transactions.failed");
+        stoppedActivity?.GetTagItem("transaction.outcome").Should().Be("failed");
+        stoppedActivity?.Status.Should().Be(ActivityStatusCode.Error);
+    }
+
+    [Fact]
+    public async Task Operations_ShouldReleaseGate()
+    {
+        var tx = new PhysicalTransaction(_context, _stateMachine, _connection, _transaction, ownsConnection: true);
+
+        ISavepoint sp = await tx.CreateSavepointAsync("sp1", CancellationToken.None);
+        sp.Should().NotBeNull();
+        tx.GateCurrentCount.Should().Be(1);
+
+        await tx.RollbackAsync(CancellationToken.None);
+        tx.GateCurrentCount.Should().Be(1);
+
+        // Subsequent rollback on already rolled back tx is a no-op and gate remains 1
+        await tx.RollbackAsync(CancellationToken.None);
+        tx.GateCurrentCount.Should().Be(1);
     }
 }

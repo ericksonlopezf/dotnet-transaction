@@ -221,11 +221,7 @@ internal sealed class TransactionContext : ITransactionContext
     /// <inheritdoc/>
     public ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) == 1)
-        {
-            return ValueTask.CompletedTask;
-        }
-
+        Interlocked.Exchange(ref _disposed, 1);
         return ValueTask.CompletedTask;
     }
 }

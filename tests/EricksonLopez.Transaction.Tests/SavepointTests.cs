@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using EricksonLopez.Transaction.Diagnostics;
+using EricksonLopez.Transaction.Dialects;
 using EricksonLopez.Transaction.Internal;
 using NSubstitute;
 using Xunit;
@@ -326,6 +327,51 @@ public sealed class SavepointTests
         var dbTx = Substitute.For<DbTransaction>();
         Action act = () => _ = new Savepoint(dbTx, name, EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance);
 
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("*contains invalid characters*");
+    }
+
+    [Fact]
+    public void ValidateName_LengthBoundaries_ShouldBeEnforced()
+    {
+        var dbTx = Substitute.For<DbTransaction>();
+        string length128 = new string('a', 128);
+        var sp128 = new Savepoint(dbTx, length128, GenericSqlDialect.Instance);
+        sp128.Name.Should().Be(length128);
+
+        string length129 = new string('a', 129);
+        Action act129 = () => _ = new Savepoint(dbTx, length129, GenericSqlDialect.Instance);
+        act129.Should().Throw<ArgumentException>()
+            .WithMessage("*must not exceed 128 characters*");
+    }
+
+    [Theory]
+    [InlineData("a")]
+    [InlineData("z")]
+    [InlineData("A")]
+    [InlineData("Z")]
+    [InlineData("0")]
+    [InlineData("9")]
+    [InlineData("_")]
+    [InlineData("aZ0_9")]
+    public void ValidateName_ValidBoundaryCharacters_ShouldSucceed(string name)
+    {
+        var dbTx = Substitute.For<DbTransaction>();
+        var sp = new Savepoint(dbTx, name, GenericSqlDialect.Instance);
+        sp.Name.Should().Be(name);
+    }
+
+    [Theory]
+    [InlineData("`")]
+    [InlineData("{")]
+    [InlineData("@")]
+    [InlineData("[")]
+    [InlineData("/")]
+    [InlineData(":")]
+    public void ValidateName_AdjacentInvalidBoundaryCharacters_ShouldThrow(string invalidChar)
+    {
+        var dbTx = Substitute.For<DbTransaction>();
+        Action act = () => _ = new Savepoint(dbTx, "sp" + invalidChar, GenericSqlDialect.Instance);
         act.Should().Throw<ArgumentException>()
             .WithMessage("*contains invalid characters*");
     }

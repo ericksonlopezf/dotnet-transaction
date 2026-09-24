@@ -52,4 +52,48 @@ public sealed class PostgreSqlConnectionFactoryTests
         conn.Should().BeOfType<NpgsqlConnection>();
         conn.State.Should().Be(System.Data.ConnectionState.Closed);
     }
+
+    [Fact]
+    public async Task Dispose_WhenOwnsDataSource_DisposesInternalDataSource()
+    {
+        var factory = new PostgreSqlConnectionFactory("Host=localhost;Database=test;Username=postgres;Password=postgres");
+        factory.Dispose();
+        Func<Task> act = () => factory.CreateConnectionAsync().AsTask();
+        await act.Should().ThrowAsync<ObjectDisposedException>();
+    }
+
+    [Fact]
+    public async Task DisposeAsync_WhenOwnsDataSource_DisposesInternalDataSourceAsync()
+    {
+        var factory = new PostgreSqlConnectionFactory("Host=localhost;Database=test;Username=postgres;Password=postgres");
+        await factory.DisposeAsync();
+        Func<Task> act = () => factory.CreateConnectionAsync().AsTask();
+        await act.Should().ThrowAsync<ObjectDisposedException>();
+    }
+
+    [Fact]
+    public async Task Dispose_WhenExternalDataSource_DoesNotDisposeDataSource()
+    {
+        var dataSource = NpgsqlDataSource.Create("Host=localhost;Database=test;Username=postgres;Password=postgres");
+        var factory = new PostgreSqlConnectionFactory(dataSource);
+        factory.Dispose();
+
+        Func<Task> act = async () => await dataSource.OpenConnectionAsync();
+        var ex = await act.Should().ThrowAsync<Exception>();
+        ex.Which.Should().BeOfType<NpgsqlException>();
+        await dataSource.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task DisposeAsync_WhenExternalDataSource_DoesNotDisposeDataSourceAsync()
+    {
+        var dataSource = NpgsqlDataSource.Create("Host=localhost;Database=test;Username=postgres;Password=postgres");
+        var factory = new PostgreSqlConnectionFactory(dataSource);
+        await factory.DisposeAsync();
+
+        Func<Task> act = async () => await dataSource.OpenConnectionAsync();
+        var ex = await act.Should().ThrowAsync<Exception>();
+        ex.Which.Should().BeOfType<NpgsqlException>();
+        await dataSource.DisposeAsync();
+    }
 }

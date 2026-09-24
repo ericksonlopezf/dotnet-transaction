@@ -38,41 +38,29 @@ internal sealed class TransactionStateMachine
 
     public void TransitionToRolledBack()
     {
-        while (true)
+        int current = Volatile.Read(ref _state);
+        if (current == (int)TransactionState.RolledBack || current == (int)TransactionState.Disposed)
         {
-            int current = Volatile.Read(ref _state);
-            if (current == (int)TransactionState.RolledBack || current == (int)TransactionState.Disposed)
-            {
-                return;
-            }
-
-            if (current != (int)TransactionState.Active && current != (int)TransactionState.Failed && current != (int)TransactionState.Created)
-            {
-                throw new TransactionStateException((TransactionState)current, "Rollback");
-            }
-
-            if (Interlocked.CompareExchange(ref _state, (int)TransactionState.RolledBack, current) == current)
-            {
-                return;
-            }
+            return;
         }
+
+        if (current == (int)TransactionState.Committed)
+        {
+            throw new TransactionStateException(TransactionState.Committed, "Rollback");
+        }
+
+        Interlocked.CompareExchange(ref _state, (int)TransactionState.RolledBack, current);
     }
 
     public void TransitionToFailed()
     {
-        while (true)
+        int current = Volatile.Read(ref _state);
+        if (current == (int)TransactionState.Committed || current == (int)TransactionState.Failed || current == (int)TransactionState.RolledBack || current == (int)TransactionState.Disposed)
         {
-            int current = Volatile.Read(ref _state);
-            if (current == (int)TransactionState.Committed || current == (int)TransactionState.Failed || current == (int)TransactionState.RolledBack || current == (int)TransactionState.Disposed)
-            {
-                return;
-            }
-
-            if (Interlocked.CompareExchange(ref _state, (int)TransactionState.Failed, current) == current)
-            {
-                return;
-            }
+            return;
         }
+
+        Interlocked.CompareExchange(ref _state, (int)TransactionState.Failed, current);
     }
 
     public void TransitionToDisposed()

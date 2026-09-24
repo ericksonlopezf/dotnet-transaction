@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using EricksonLopez.Transaction.Diagnostics;
+using EricksonLopez.Transaction.Dialects;
 using EricksonLopez.Transaction.Internal;
 using NSubstitute;
 using Xunit;
@@ -297,8 +298,151 @@ public sealed class TransactionContextTests
         var hook = Substitute.For<ITransactionEnlistment>();
         Action enlistAct = () => context.Enlist(hook);
         Func<Task> savepointAct = () => context.CreateSavepointAsync("sp1", CancellationToken.None);
+        Action connAct = () => _ = context.Connection;
+        Action txAct = () => _ = context.Transaction;
 
         enlistAct.Should().Throw<ObjectDisposedException>();
         await savepointAct.Should().ThrowAsync<ObjectDisposedException>();
+        connAct.Should().Throw<ObjectDisposedException>();
+        txAct.Should().Throw<ObjectDisposedException>();
+    }
+
+    [Fact]
+    public void SetRollbackOnly_ShouldSetFlagAndReason()
+    {
+        var dbConn = Substitute.For<DbConnection>();
+        var dbTx = Substitute.For<DbTransaction>();
+        var sm = new TransactionStateMachine();
+        var context = new TransactionContext(Guid.NewGuid(), dbConn, dbTx, TransactionIsolationLevel.ReadCommitted, sm, GenericSqlDialect.Instance, CancellationToken.None);
+
+        context.IsRollbackOnly.Should().BeFalse();
+        context.SetRollbackOnly("Inner scope forced rollback");
+        context.IsRollbackOnly.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task CreateSavepointAsync_WhenFallbackThrowsGenericException_ShouldWrapInNotSupportedException()
+    {
+        var conn = new MockDbConnection();
+        var tx = new SaveThrowingTransaction(conn);
+        var sm = new TransactionStateMachine();
+        var context = new TransactionContext(Guid.NewGuid(), conn, tx, TransactionIsolationLevel.ReadCommitted, sm, GenericSqlDialect.Instance, CancellationToken.None);
+
+        // Make mock connection command throw
+        var throwingConn = new ThrowingCommandConnection();
+        var throwingContext = new TransactionContext(Guid.NewGuid(), throwingConn, new SaveThrowingTransaction(throwingConn), TransactionIsolationLevel.ReadCommitted, sm, GenericSqlDialect.Instance, CancellationToken.None);
+
+        Func<Task> act = () => throwingContext.CreateSavepointAsync("sp_fallback_fail", CancellationToken.None);
+
+        var ex = await act.Should().ThrowAsync<NotSupportedException>();
+        ex.Which.Message.Should().Contain("does not support savepoints");
+    }
+
+    [Fact]
+    public async Task CreateSavepointAsync_WhenFallbackThrowsOperationCanceledException_ShouldRethrowDirectly()
+    {
+        var sm = new TransactionStateMachine();
+        var cancelingConn = new CancelingCommandConnection();
+        var cancelingContext = new TransactionContext(Guid.NewGuid(), cancelingConn, new SaveThrowingTransaction(cancelingConn), TransactionIsolationLevel.ReadCommitted, sm, GenericSqlDialect.Instance, CancellationToken.None);
+
+        Func<Task> act = () => cancelingContext.CreateSavepointAsync("sp_fallback_canceled", CancellationToken.None);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    private sealed class ThrowingCommandConnection : DbConnection
+    {
+        [AllowNull]
+        public override string ConnectionString { get; set; } = string.Empty;
+        public override string Database => "TestDb";
+        public override string DataSource => "localhost";
+        public override string ServerVersion => "1.0";
+        public override ConnectionState State => ConnectionState.Open;
+        public override void ChangeDatabase(string databaseName) { }
+        public override void Close() { }
+        public override void Open() { }
+        protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel) => throw new NotImplementedException();
+        protected override DbCommand CreateDbCommand() => new ThrowingDbCommand();
+    }
+
+    private sealed class CancelingCommandConnection : DbConnection
+    {
+        [AllowNull]
+        public override string ConnectionString { get; set; } = string.Empty;
+        public override string Database => "TestDb";
+        public override string DataSource => "localhost";
+        public override string ServerVersion => "1.0";
+        public override ConnectionState State => ConnectionState.Open;
+        public override void ChangeDatabase(string databaseName) { }
+        public override void Close() { }
+        public override void Open() { }
+        protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel) => throw new NotImplementedException();
+        protected override DbCommand CreateDbCommand() => new CancelingDbCommand();
+    }
+
+    private sealed class ThrowingDbCommand : DbCommand
+    {
+        [AllowNull]
+        public override string CommandText { get; set; } = string.Empty;
+        public override int CommandTimeout { get; set; }
+        public override CommandType CommandType { get; set; }
+        public override bool DesignTimeVisible { get; set; }
+        public override UpdateRowSource UpdatedRowSource { get; set; }
+        protected override DbConnection? DbConnection { get; set; }
+        protected override DbParameterCollection DbParameterCollection => throw new NotImplementedException();
+        protected override DbTransaction? DbTransaction { get; set; }
+        public override void Cancel() { }
+        public override int ExecuteNonQuery() => throw new InvalidOperationException("Command failed");
+        public override object? ExecuteScalar() => null;
+        public override void Prepare() { }
+        protected override DbParameter CreateDbParameter() => throw new NotImplementedException();
+        protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior) => throw new NotImplementedException();
+        public override Task<int> ExecuteNonQueryAsync(CancellationToken cancellationToken) => Task.FromException<int>(new InvalidOperationException("Command failed"));
+    }
+
+    private sealed class CancelingDbCommand : DbCommand
+    {
+        [AllowNull]
+        public override string CommandText { get; set; } = string.Empty;
+        public override int CommandTimeout { get; set; }
+        public override CommandType CommandType { get; set; }
+        public override bool DesignTimeVisible { get; set; }
+        public override UpdateRowSource UpdatedRowSource { get; set; }
+        protected override DbConnection? DbConnection { get; set; }
+        protected override DbParameterCollection DbParameterCollection => throw new NotImplementedException();
+        protected override DbTransaction? DbTransaction { get; set; }
+        public override void Cancel() { }
+        public override int ExecuteNonQuery() => throw new OperationCanceledException();
+        public override object? ExecuteScalar() => null;
+        public override void Prepare() { }
+        protected override DbParameter CreateDbParameter() => throw new NotImplementedException();
+        protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior) => throw new NotImplementedException();
+        public override Task<int> ExecuteNonQueryAsync(CancellationToken cancellationToken) => Task.FromException<int>(new OperationCanceledException());
+    }
+
+    [Fact]
+    public async Task CreateSavepointAsync_WhenDisposed_ThrowsObjectDisposedException()
+    {
+        var machine = new TransactionStateMachine(TransactionState.Active);
+        var conn = Substitute.For<DbConnection>();
+        var tx = Substitute.For<DbTransaction>();
+        var context = new TransactionContext(Guid.NewGuid(), conn, tx, TransactionIsolationLevel.ReadCommitted, machine, GenericSqlDialect.Instance, CancellationToken.None);
+        await context.DisposeAsync();
+
+        Func<Task> act = () => context.CreateSavepointAsync("sp1");
+        await act.Should().ThrowAsync<ObjectDisposedException>();
+    }
+
+    [Fact]
+    public async Task CreateSavepointAsync_WhenDisposed_ThrowsObjectDisposedExceptionBeforeValidatingName()
+    {
+        var machine = new TransactionStateMachine(TransactionState.Active);
+        var conn = Substitute.For<DbConnection>();
+        var tx = Substitute.For<DbTransaction>();
+        var context = new TransactionContext(Guid.NewGuid(), conn, tx, TransactionIsolationLevel.ReadCommitted, machine, GenericSqlDialect.Instance, CancellationToken.None);
+        await context.DisposeAsync();
+
+        Func<Task> act = () => context.CreateSavepointAsync("   ");
+        await act.Should().ThrowAsync<ObjectDisposedException>();
     }
 }

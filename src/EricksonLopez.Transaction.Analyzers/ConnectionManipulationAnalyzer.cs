@@ -39,50 +39,31 @@ public sealed class ConnectionManipulationAnalyzer : DiagnosticAnalyzer
         context.RegisterSyntaxNodeAction(AnalyzeNode, SyntaxKind.InvocationExpression);
     }
 
-    private void AnalyzeNode(SyntaxNodeAnalysisContext context)
+    private static void AnalyzeNode(SyntaxNodeAnalysisContext context)
     {
-        var invocationExpr = (InvocationExpressionSyntax)context.Node;
-        
-        if (invocationExpr.Expression is MemberAccessExpressionSyntax memberAccessExpr)
+        if (context.Node is not InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax memberAccessExpr })
         {
-            var methodName = memberAccessExpr.Name.Identifier.Text;
-            
-            // Dangerous methods that bypass transaction manager state machine
-            if (methodName != "Close" && 
-                methodName != "Dispose" && 
-                methodName != "DisposeAsync" && 
-                methodName != "ChangeDatabase" &&
-                methodName != "BeginTransaction" &&
-                methodName != "BeginTransactionAsync")
-            {
-                return;
-            }
+            return;
+        }
 
-            // Verify whether expression on the left of invocation (e.g. ctx.Connection)
-            // is the Connection property of ITransactionContext or a DbConnection returned by it.
-            var targetType = context.SemanticModel.GetTypeInfo(memberAccessExpr.Expression).Type;
-            if (targetType == null)
-            {
-                return;
-            }
+        var methodName = memberAccessExpr.Name.Identifier.Text;
+        if (!IsDangerousMethod(methodName))
+        {
+            return;
+        }
 
-            // Check if targetType is DbConnection originating from ITransactionContext
-            if (targetType.Name == "DbConnection" && targetType.ContainingNamespace?.ToDisplayString() == "System.Data.Common")
+        var symbolInfo = context.SemanticModel.GetSymbolInfo(memberAccessExpr.Expression, context.CancellationToken);
+        if (symbolInfo.Symbol is IPropertySymbol
             {
-                var symbolInfo = context.SemanticModel.GetSymbolInfo(memberAccessExpr.Expression);
-                var symbol = symbolInfo.Symbol;
-                
-                if (symbol is IPropertySymbol propertySymbol)
-                {
-                    if (propertySymbol.Name == "Connection" && 
-                        propertySymbol.ContainingType?.Name == "ITransactionContext" &&
-                        propertySymbol.ContainingType?.ContainingNamespace?.ToDisplayString() == "EricksonLopez.Transaction")
-                    {
-                        var diagnostic = Diagnostic.Create(Rule, memberAccessExpr.Name.GetLocation(), methodName);
-                        context.ReportDiagnostic(diagnostic);
-                    }
-                }
-            }
+                Name: "Connection",
+                ContainingType: { Name: "ITransactionContext", ContainingNamespace: { } ns }
+            } && ns.ToDisplayString() == "EricksonLopez.Transaction")
+        {
+            var diagnostic = Diagnostic.Create(Rule, memberAccessExpr.Name.GetLocation(), methodName);
+            context.ReportDiagnostic(diagnostic);
         }
     }
+
+    private static bool IsDangerousMethod(string methodName) =>
+        methodName is "Close" or "Dispose" or "DisposeAsync" or "ChangeDatabase" or "BeginTransaction" or "BeginTransactionAsync";
 }

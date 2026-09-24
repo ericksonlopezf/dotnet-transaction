@@ -63,7 +63,7 @@ internal sealed class SuppressedTransactionScope : ITransaction
     public Task<ISavepoint> CreateSavepointAsync(string name, CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed == 1, this);
-        throw new InvalidOperationException("Cannot create savepoints on a suppressed transaction scope.");
+        return Task.FromException<ISavepoint>(new InvalidOperationException("Cannot create savepoints on a suppressed transaction scope."));
     }
 
     /// <inheritdoc/>

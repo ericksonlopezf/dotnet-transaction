@@ -40,11 +40,7 @@ public static class TransactionDapperExtensions
 
         CancellationToken combinedToken = (!cancellationToken.CanBeCanceled || cancellationToken == context.CancellationToken)
             ? context.CancellationToken
-            : (!context.CancellationToken.CanBeCanceled
-                ? cancellationToken
-                : (context.CancellationToken.IsCancellationRequested
-                    ? context.CancellationToken
-                    : cancellationToken));
+            : cancellationToken;
 
         return new CommandDefinition(
             commandText: commandText,
@@ -56,7 +52,7 @@ public static class TransactionDapperExtensions
             cancellationToken: combinedToken);
     }
 
-    private static (CancellationToken Token, CancellationTokenSource? LinkedCts) ResolveToken(
+    internal static (CancellationToken Token, CancellationTokenSource? LinkedCts) ResolveToken(
         ITransactionContext context,
         CancellationToken cancellationToken)
     {
@@ -66,16 +62,6 @@ public static class TransactionDapperExtensions
         }
 
         if (!context.CancellationToken.CanBeCanceled)
-        {
-            return (cancellationToken, null);
-        }
-
-        if (context.CancellationToken.IsCancellationRequested)
-        {
-            return (context.CancellationToken, null);
-        }
-
-        if (cancellationToken.IsCancellationRequested)
         {
             return (cancellationToken, null);
         }

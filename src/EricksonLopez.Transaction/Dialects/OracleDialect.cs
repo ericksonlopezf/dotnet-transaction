@@ -11,9 +11,7 @@ internal sealed class OracleDialect : IDatabaseDialect
     public bool CanHandle(DbConnection connection)
     {
         string? fullName = connection.GetType().FullName;
-        return fullName?.StartsWith("Oracle.ManagedDataAccess.Client.", StringComparison.Ordinal) == true ||
-               fullName?.StartsWith("Oracle.", StringComparison.Ordinal) == true ||
-               fullName?.IndexOf("Oracle", StringComparison.OrdinalIgnoreCase) >= 0;
+        return fullName?.IndexOf("Oracle", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     public async Task ApplyReadOnlyModeAsync(DbConnection connection, DbTransaction transaction, CancellationToken cancellationToken = default)
