@@ -34,21 +34,22 @@ public sealed class PostgreSqlConnectionFactoryTests
         var dataSource = NpgsqlDataSource.Create("Host=localhost;Database=test;Username=postgres;Password=postgres");
         var factory = new PostgreSqlConnectionFactory(dataSource);
 
-        // We test that factory delegates to data source
-        // Note: opening without a real PG instance will attempt TCP connection and throw NpgsqlException,
-        // which proves the factory successfully invoked NpgsqlDataSource.OpenConnection() and OpenConnectionAsync().
+        // Async method opens connection and throws without a running server
         Func<Task> actAsync = async () => await factory.CreateConnectionAsync(CancellationToken.None);
-        Action actSync = () => factory.CreateConnection();
-
         await actAsync.Should().ThrowAsync<NpgsqlException>();
-        actSync.Should().Throw<NpgsqlException>();
+
+        // Sync method creates a new unopened connection conforming to IDbConnectionFactory
+        using var conn = factory.CreateConnection();
+        conn.Should().BeOfType<NpgsqlConnection>();
+        conn.State.Should().Be(System.Data.ConnectionState.Closed);
     }
 
     [Fact]
     public void Constructor_WithConnectionString_ShouldInitialize()
     {
         var factory = new PostgreSqlConnectionFactory("Host=localhost;Database=test;Username=postgres;Password=postgres");
-        Action act = () => factory.CreateConnection();
-        act.Should().Throw<NpgsqlException>();
+        using var conn = factory.CreateConnection();
+        conn.Should().BeOfType<NpgsqlConnection>();
+        conn.State.Should().Be(System.Data.ConnectionState.Closed);
     }
 }

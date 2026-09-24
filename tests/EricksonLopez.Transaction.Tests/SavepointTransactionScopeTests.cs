@@ -38,7 +38,7 @@ public sealed class SavepointTransactionScopeTests
 
         await using var dbTx = await connection.BeginTransactionAsync();
         var machine = new TransactionStateMachine(TransactionState.Active);
-        var context = new TransactionContext(Guid.NewGuid(), connection, dbTx, TransactionIsolationLevel.ReadCommitted, machine, CancellationToken.None);
+        var context = new TransactionContext(Guid.NewGuid(), connection, dbTx, TransactionIsolationLevel.ReadCommitted, machine, EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance, CancellationToken.None);
 
         await using (var cmd = connection.CreateCommand())
         {

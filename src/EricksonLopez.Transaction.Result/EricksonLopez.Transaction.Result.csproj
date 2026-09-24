@@ -7,7 +7,7 @@
     <AssemblyName>EricksonLopez.Transaction.Result</AssemblyName>
     <Description>Seamless integration between EricksonLopez.Transaction and EricksonLopez.Result monad with automatic failure rollback.</Description>
     <PackageId>EricksonLopez.Transaction.Result</PackageId>
-    <PackageTags>$(CommonPackageTags);result;result-pattern;functional-programming;railway-oriented-programming;error-handling;automatic-rollback</PackageTags>
+    <PackageTags>$(CommonPackageTags);result-pattern;functional-programming;railway-oriented-programming;error-handling;automatic-rollback;native-aot</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

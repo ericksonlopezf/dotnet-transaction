@@ -1,7 +1,10 @@
 # ADR-023: Rejection of Infrastructure Scope Expansion (ORM Tracking, Connection Pooling, Query Caching)
 
 ## Status
-Accepted (Rejection)
+Accepted (Rejection) — *Note: Section 4 ("EF Core DbContext Integration") was subsequently superseded by [ADR-027](adr-027-entity-framework-core-transaction-enlistment.md) via the dedicated package `EricksonLopez.Transaction.EntityFrameworkCore`. Sections 1, 2, and 3 remain fully normative.*
+
+## Date
+2026-09-04
 
 ## Context
 Several proposals have been put forward to extend `EricksonLopez.Transaction` beyond its core mandate of local database transaction coordination. These proposals involve infrastructure responsibilities that belong to other layers, libraries, or frameworks.
@@ -34,7 +37,10 @@ We **systematically reject** the following infrastructure scope expansions:
 - Transactional cache invalidation semantics are complex, subtly incorrect at different isolation levels (READ COMMITTED vs. SNAPSHOT), and invisible to outer layers — creating hidden behavior.
 - The `EricksonLopez.Transaction` library's role ends at providing an ACID-safe data boundary. Caching decisions beyond that boundary belong to the consumer.
 
-### 4. EF Core `DbContext` Integration
+### 4. EF Core `DbContext` Integration *(Superseded by ADR-027)*
+
+> ⚠️ **Superseded in Part**: The rejection of EF Core integration was subsequently superseded by [ADR-027](adr-027-entity-framework-core-transaction-enlistment.md), which introduced the standalone bridge package `EricksonLopez.Transaction.EntityFrameworkCore` using `dbContext.Database.UseTransactionAsync()` without coupling the core library to EF Core. The historical rationale below is preserved for architectural context.
+
 **Proposed**: Providing integration points between `ITransactionManager` and EF Core's `DbContext.Database.BeginTransactionAsync()`.
 
 **Rejection Rationale**:

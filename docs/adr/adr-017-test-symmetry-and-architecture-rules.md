@@ -3,6 +3,9 @@
 ## Status
 Accepted
 
+## Date
+2026-09-04
+
 ## Context
 In accordance with the EricksonLopez ecosystem engineering guidelines, every production assembly in `src/` must have a corresponding symmetric test assembly in `tests/` named `<PackageName>.Tests`. Additionally, cross-cutting architectural invariants and end-to-end integration flows must be validated in dedicated suites (`ArchitectureTests` and `IntegrationTests`).
 

@@ -773,12 +773,42 @@ public sealed class TransactionManagerTests
         await act4.Should().ThrowAsync<ArgumentNullException>();
     }
 
+    private sealed class NpgsqlFakeDialect : IDatabaseDialect
+    {
+        public bool CanHandle(DbConnection connection) => connection is NpgsqlFakeConnection;
+        public async Task ApplyReadOnlyModeAsync(DbConnection connection, DbTransaction transaction, CancellationToken cancellationToken = default)
+        {
+            await using DbCommand cmd = connection.CreateCommand();
+            cmd.Transaction = transaction;
+            cmd.CommandText = "SET TRANSACTION READ ONLY;";
+            await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        public string GetSavepointCreationSql(string savepointName) => $"SAVEPOINT {savepointName};";
+        public string GetSavepointRollbackSql(string savepointName) => $"ROLLBACK TO SAVEPOINT {savepointName};";
+        public string? GetSavepointReleaseSql(string savepointName) => $"RELEASE SAVEPOINT {savepointName};";
+    }
+
+    private sealed class MySqlFakeDialect : IDatabaseDialect
+    {
+        public bool CanHandle(DbConnection connection) => connection is MySqlFakeConnection;
+        public async Task ApplyReadOnlyModeAsync(DbConnection connection, DbTransaction transaction, CancellationToken cancellationToken = default)
+        {
+            await using DbCommand cmd = connection.CreateCommand();
+            cmd.Transaction = transaction;
+            cmd.CommandText = "SET TRANSACTION READ ONLY;";
+            await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        public string GetSavepointCreationSql(string savepointName) => $"SAVEPOINT {savepointName};";
+        public string GetSavepointRollbackSql(string savepointName) => $"ROLLBACK TO SAVEPOINT {savepointName};";
+        public string? GetSavepointReleaseSql(string savepointName) => $"RELEASE SAVEPOINT {savepointName};";
+    }
+
     [Fact]
     public async Task ReadOnlyOption_OnNpgsqlAndMySql_ShouldApplySetTransactionReadOnly()
     {
         var npgsqlConn = new NpgsqlFakeConnection();
         var npgsqlFactory = new DelegateDbConnectionFactory(() => npgsqlConn);
-        var npgsqlManager = new TransactionManager(npgsqlFactory);
+        var npgsqlManager = new TransactionManager(npgsqlFactory, dialects: new[] { new NpgsqlFakeDialect() });
 
         await npgsqlManager.ExecuteAsync(async ctx =>
         {
@@ -790,7 +820,7 @@ public sealed class TransactionManagerTests
 
         var mysqlConn = new MySqlFakeConnection();
         var mysqlFactory = new DelegateDbConnectionFactory(() => mysqlConn);
-        var mysqlManager = new TransactionManager(mysqlFactory);
+        var mysqlManager = new TransactionManager(mysqlFactory, dialects: new[] { new MySqlFakeDialect() });
 
         await mysqlManager.ExecuteAsync(async ctx =>
         {

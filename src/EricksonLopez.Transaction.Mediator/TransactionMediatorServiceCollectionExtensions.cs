@@ -13,8 +13,9 @@ public static class TransactionMediatorServiceCollectionExtensions
     /// <summary>
     /// Registers the <see cref="TransactionPipelineBehavior{TRequest, TResponse}"/> as an open-generic pipeline behavior.
     /// </summary>
-    /// <param name="services">The service collection.</param>
-    /// <returns>The same service collection for chaining.</returns>
+    /// <param name="services">The <see cref="IServiceCollection"/> to add services to.</param>
+    /// <returns>The <see cref="IServiceCollection"/> instance so that additional calls can be chained.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="services"/> is <see langword="null"/></exception>
     public static IServiceCollection AddTransactionPipelineBehavior(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);

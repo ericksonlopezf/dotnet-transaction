@@ -56,6 +56,7 @@ public sealed class DelegateDbConnectionFactory : IDbConnectionFactory
         => _asyncFactory(cancellationToken);
 
     /// <inheritdoc/>
+    /// <exception cref="NotSupportedException">Thrown when the factory was configured with an asynchronous delegate.</exception>
     public DbConnection CreateConnection()
         => _syncFactory();
 }

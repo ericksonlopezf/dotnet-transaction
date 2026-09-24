@@ -15,7 +15,7 @@ public static class TransactionDiagnostics
     public const string SourceName = "EricksonLopez.Transaction";
 
     /// <summary>Specifies the semantic version of the instrumentation schema emitted by this source.</summary>
-    public const string Version = "1.0.0";
+    public const string Version = "2.0.0";
 
     /// <summary>
     /// Gets the <see cref="ActivitySource"/> used for distributed transaction tracing.
@@ -82,23 +82,30 @@ public static class TransactionDiagnostics
     /// <param name="transactionId">The unique transaction identifier.</param>
     /// <param name="isolationLevel">The isolation level of the transaction.</param>
     /// <param name="transactionName">An optional logical name or purpose assigned to the transaction.</param>
+    /// <param name="sanitizeTelemetryMetadata">
+    /// When <see langword="true"/>, redacts the <c>transaction.id</c> and <c>transaction.name</c> tags
+    /// from the emitted span to prevent personally identifiable information (PII) or sensitive infrastructure
+    /// identifiers from appearing in distributed tracing platforms (Datadog, Jaeger, Honeycomb, etc.).
+    /// Corresponds to <see cref="TransactionOptions.SanitizeTelemetryMetadata"/>.
+    /// </param>
     /// <returns>The created <see cref="Activity"/>, or <see langword="null"/> if no listeners are registered.</returns>
     public static Activity? StartActivity(
         string name,
         Guid transactionId,
         TransactionIsolationLevel isolationLevel,
-        string? transactionName = null)
+        string? transactionName = null,
+        bool sanitizeTelemetryMetadata = false)
     {
         Activity? activity = ActivitySource.StartActivity(name, ActivityKind.Internal);
         if (activity is not null)
         {
             activity.SetTag("db.system", "relational");
-            activity.SetTag("transaction.id", transactionId.ToString());
-            activity.SetTag(TagIsolationLevel, isolationLevel.ToString());
+            activity.SetTag("transaction.id", sanitizeTelemetryMetadata ? "[REDACTED]" : transactionId.ToString());
+            activity.SetTag(TagIsolationLevel, GetIsolationLevelString(isolationLevel));
 
             if (!string.IsNullOrWhiteSpace(transactionName))
             {
-                activity.SetTag("transaction.name", transactionName);
+                activity.SetTag("transaction.name", sanitizeTelemetryMetadata ? "[REDACTED]" : transactionName);
             }
         }
 
@@ -111,7 +118,7 @@ public static class TransactionDiagnostics
     /// <param name="isolationLevel">The isolation level of the started transaction.</param>
     public static void RecordStarted(TransactionIsolationLevel isolationLevel)
     {
-        StartedCounter.Add(1, new KeyValuePair<string, object?>(TagIsolationLevel, isolationLevel.ToString()));
+        StartedCounter.Add(1, new KeyValuePair<string, object?>(TagIsolationLevel, GetIsolationLevelString(isolationLevel)));
     }
 
     /// <summary>
@@ -121,7 +128,7 @@ public static class TransactionDiagnostics
     /// <param name="durationMs">The total duration of the transaction in milliseconds.</param>
     public static void RecordCommitted(TransactionIsolationLevel isolationLevel, double durationMs)
     {
-        CommittedCounter.Add(1, new KeyValuePair<string, object?>(TagIsolationLevel, isolationLevel.ToString()));
+        CommittedCounter.Add(1, new KeyValuePair<string, object?>(TagIsolationLevel, GetIsolationLevelString(isolationLevel)));
         DurationHistogram.Record(durationMs, new KeyValuePair<string, object?>(TagOutcome, "committed"));
     }
 
@@ -132,7 +139,7 @@ public static class TransactionDiagnostics
     /// <param name="durationMs">The total duration of the transaction in milliseconds.</param>
     public static void RecordRolledBack(TransactionIsolationLevel isolationLevel, double durationMs)
     {
-        RolledBackCounter.Add(1, new KeyValuePair<string, object?>(TagIsolationLevel, isolationLevel.ToString()));
+        RolledBackCounter.Add(1, new KeyValuePair<string, object?>(TagIsolationLevel, GetIsolationLevelString(isolationLevel)));
         DurationHistogram.Record(durationMs, new KeyValuePair<string, object?>(TagOutcome, "rolled_back"));
     }
 
@@ -145,10 +152,21 @@ public static class TransactionDiagnostics
     public static void RecordFailed(TransactionIsolationLevel isolationLevel, double durationMs, string? errorType)
     {
         FailedCounter.Add(1,
-            new KeyValuePair<string, object?>(TagIsolationLevel, isolationLevel.ToString()),
+            new KeyValuePair<string, object?>(TagIsolationLevel, GetIsolationLevelString(isolationLevel)),
             new KeyValuePair<string, object?>(TagErrorType, errorType ?? "Unknown"));
         DurationHistogram.Record(durationMs, new KeyValuePair<string, object?>(TagOutcome, "failed"));
     }
+
+    private static string GetIsolationLevelString(TransactionIsolationLevel level) => level switch
+    {
+        TransactionIsolationLevel.Unspecified => "Unspecified",
+        TransactionIsolationLevel.ReadUncommitted => "ReadUncommitted",
+        TransactionIsolationLevel.ReadCommitted => "ReadCommitted",
+        TransactionIsolationLevel.RepeatableRead => "RepeatableRead",
+        TransactionIsolationLevel.Serializable => "Serializable",
+        TransactionIsolationLevel.Snapshot => "Snapshot",
+        _ => level.ToString()
+    };
 
     /// <summary>
     /// Records the creation of a savepoint.

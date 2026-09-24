@@ -7,7 +7,7 @@
     <AssemblyName>EricksonLopez.Transaction.MySql</AssemblyName>
     <Description>MySQL connection factory, transaction extensions, and MySQL error code classifier for EricksonLopez.Transaction using MySqlConnector.</Description>
     <PackageId>EricksonLopez.Transaction.MySql</PackageId>
-    <PackageTags>$(CommonPackageTags);mysql;mysqlconnector;innodb;savepoints;deadlock-detection;database-provider</PackageTags>
+    <PackageTags>$(CommonPackageTags);mysql;mysqlconnector;innodb;savepoint;deadlock-detection;database-provider;native-aot</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

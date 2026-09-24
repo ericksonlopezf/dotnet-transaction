@@ -6,7 +6,7 @@
     <RootNamespace>EricksonLopez.Transaction.Mediator</RootNamespace>
     <PackageId>EricksonLopez.Transaction.Mediator</PackageId>
     <Description>Enterprise mediator pipeline behavior for EricksonLopez.Transaction. Automatically coordinates database transaction lifecycles, committing on success and rolling back on functional failure (Result.IsFailure) or unhandled exceptions.</Description>
-    <PackageTags>$(CommonPackageTags);mediator;pipeline;cqrs;transactions;result-pattern;unit-of-work</PackageTags>
+    <PackageTags>$(CommonPackageTags);mediator;cqrs;pipeline-behavior;unit-of-work;result-pattern;native-aot</PackageTags>
     <IsPackable>true</IsPackable>
   </PropertyGroup>
 

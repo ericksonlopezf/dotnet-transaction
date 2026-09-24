@@ -9,7 +9,7 @@ using EricksonLopez.Transaction.Diagnostics;
 namespace EricksonLopez.Transaction.Internal;
 
 /// <summary>
-/// Default implementation of <see cref="ITransactionContext"/>.
+/// Represents the default implementation of <see cref="ITransactionContext"/>.
 /// </summary>
 internal sealed class TransactionContext : ITransactionContext
 {
@@ -20,7 +20,12 @@ internal sealed class TransactionContext : ITransactionContext
 #else
     private readonly object _lock = new();
 #endif
-    private bool _disposed;
+    private readonly DbConnection _connection;
+    private readonly DbTransaction _transaction;
+    private int _disposed;
+    private volatile bool _isRollbackOnly;
+    private string? _rollbackOnlyReason;
+    private readonly IDatabaseDialect _dialect;
 
     public TransactionContext(
         Guid transactionId,
@@ -28,13 +33,15 @@ internal sealed class TransactionContext : ITransactionContext
         DbTransaction transaction,
         TransactionIsolationLevel isolationLevel,
         TransactionStateMachine stateMachine,
+        IDatabaseDialect dialect,
         CancellationToken cancellationToken)
     {
         TransactionId = transactionId;
-        Connection = connection ?? throw new ArgumentNullException(nameof(connection));
-        Transaction = transaction ?? throw new ArgumentNullException(nameof(transaction));
+        _connection = connection ?? throw new ArgumentNullException(nameof(connection));
+        _transaction = transaction ?? throw new ArgumentNullException(nameof(transaction));
         IsolationLevel = isolationLevel;
         _stateMachine = stateMachine ?? throw new ArgumentNullException(nameof(stateMachine));
+        _dialect = dialect ?? throw new ArgumentNullException(nameof(dialect));
         CancellationToken = cancellationToken;
     }
 
@@ -42,10 +49,24 @@ internal sealed class TransactionContext : ITransactionContext
     public Guid TransactionId { get; }
 
     /// <inheritdoc/>
-    public DbConnection Connection { get; }
+    public DbConnection Connection
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed == 1, this);
+            return _connection;
+        }
+    }
 
     /// <inheritdoc/>
-    public DbTransaction Transaction { get; }
+    public DbTransaction Transaction
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed == 1, this);
+            return _transaction;
+        }
+    }
 
     /// <inheritdoc/>
     public TransactionState State => _stateMachine.CurrentState;
@@ -69,11 +90,21 @@ internal sealed class TransactionContext : ITransactionContext
     }
 
     /// <inheritdoc/>
+    public bool IsRollbackOnly => _isRollbackOnly;
+
+    /// <inheritdoc/>
+    public void SetRollbackOnly(string reason)
+    {
+        _isRollbackOnly = true;
+        _rollbackOnlyReason = reason;
+    }
+
+    /// <inheritdoc/>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("csharpsquid", "S2077:Use a parameterized query instead of string formatting", Justification = "Savepoint identifiers cannot be parameterized in SQL syntax and the identifier is validated to contain only alphanumeric characters and underscores.")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "CA2100:Review SQL queries for security vulnerabilities", Justification = "Savepoint name is validated as a strict alphanumeric identifier.")]
     public async Task<ISavepoint> CreateSavepointAsync(string name, CancellationToken cancellationToken = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(_disposed == 1, this);
 
         Savepoint.ValidateName(name);
 
@@ -87,21 +118,29 @@ internal sealed class TransactionContext : ITransactionContext
         catch (NotSupportedException)
         {
             // Fallback for providers not implementing DbTransaction.SaveAsync
-            await using DbCommand cmd = Connection.CreateCommand();
-            cmd.Transaction = Transaction;
-            cmd.CommandText = $"SAVEPOINT {name};";
-            await cmd.ExecuteNonQueryAsync(combinedToken).ConfigureAwait(false);
+            string saveSql = _dialect.GetSavepointCreationSql(name);
+            try
+            {
+                await using DbCommand cmd = _connection.CreateCommand();
+                cmd.Transaction = _transaction;
+                cmd.CommandText = saveSql;
+                await cmd.ExecuteNonQueryAsync(combinedToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                throw new NotSupportedException($"The underlying database provider '{_connection.GetType().Name}' does not support savepoints.", ex);
+            }
         }
 
         TransactionDiagnostics.RecordSavepointCreated();
-        return new Savepoint(Transaction, name);
+        return new Savepoint(Transaction, name, _dialect);
     }
 
     /// <inheritdoc/>
     public void Enlist(ITransactionEnlistment enlistment)
     {
         ArgumentNullException.ThrowIfNull(enlistment);
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(_disposed == 1, this);
 
         lock (_lock)
         {
@@ -182,7 +221,11 @@ internal sealed class TransactionContext : ITransactionContext
     /// <inheritdoc/>
     public ValueTask DisposeAsync()
     {
-        _disposed = true;
+        if (Interlocked.Exchange(ref _disposed, 1) == 1)
+        {
+            return ValueTask.CompletedTask;
+        }
+
         return ValueTask.CompletedTask;
     }
 }

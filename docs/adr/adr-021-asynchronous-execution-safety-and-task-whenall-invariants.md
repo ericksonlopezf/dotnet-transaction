@@ -3,6 +3,9 @@
 ## Status
 Accepted
 
+## Date
+2026-09-04
+
 ## Context
 In modern .NET applications, `AsyncLocal<T>` allows execution context values to flow automatically down asynchronous call trees (`await Task.Yield()`, asynchronous I/O continuations). However, when developers spawn concurrent asynchronous operations on the same logical execution tree using `Task.WhenAll` or `Parallel.ForEachAsync`, child tasks share a copy of the ambient `ITransactionContext`.
 

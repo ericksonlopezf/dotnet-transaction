@@ -3,6 +3,9 @@
 ## Status
 Accepted
 
+## Date
+2026-09-04
+
 ## Context
 The EricksonLopez ecosystem supports multiple relational database engines across enterprise workloads:
 1. PostgreSQL (`Npgsql`)

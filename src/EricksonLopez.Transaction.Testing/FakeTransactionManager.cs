@@ -19,7 +19,7 @@ public sealed class FakeTransactionManager : ITransactionManager
     private readonly List<FakeTransaction> _startedTransactions = new();
 
     /// <summary>
-    /// Gets the list of transactions created by this manager.
+    /// Gets the read-only collection of transactions created by this manager.
     /// </summary>
     public IReadOnlyList<FakeTransaction> StartedTransactions => _startedTransactions.ToArray();
 
@@ -42,7 +42,13 @@ public sealed class FakeTransactionManager : ITransactionManager
             CancellationToken = cancellationToken
         };
 
-        var tx = new FakeTransaction(context)
+        var tx = new FakeTransaction(context, () =>
+        {
+            if (ReferenceEquals(CurrentContext, context))
+            {
+                CurrentContext = null;
+            }
+        })
         {
             ExceptionToThrowOnCommit = ExceptionToThrowOnCommit
         };

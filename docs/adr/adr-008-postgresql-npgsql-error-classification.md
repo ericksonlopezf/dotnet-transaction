@@ -3,6 +3,9 @@
 ## Status
 Accepted
 
+## Date
+2026-09-04
+
 ## Context
 PostgreSQL exposes deterministic error codes via the standard SQLSTATE string in `Npgsql.PostgresException.SqlState`. Different SQLSTATE codes represent distinct recovery semantics:
 - `40001` (Serialization Failure): Expected under `Serializable` isolation level when concurrent transactions conflict. Resolved by retrying the entire transaction block.

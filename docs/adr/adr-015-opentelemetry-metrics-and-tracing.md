@@ -3,6 +3,9 @@
 ## Status
 Accepted
 
+## Date
+2026-09-04
+
 ## Context
 Production monitoring of transaction performance, duration bottlenecks, isolation level contention, and rollback rates is essential for maintaining database health and diagnosing serialization anomalies.
 

@@ -1,3 +1,4 @@
+// Copyright © Erickson Lopez. MIT License.
 using EricksonLopez.Mediator;
 
 namespace EricksonLopez.Transaction.Mediator.Tests;

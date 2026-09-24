@@ -2,13 +2,16 @@
   <Folder Name="/src/">
     <Project Path="src/EricksonLopez.Transaction.Abstractions/EricksonLopez.Transaction.Abstractions.csproj" />
     <Project Path="src/EricksonLopez.Transaction/EricksonLopez.Transaction.csproj" />
+    <Project Path="src/EricksonLopez.Transaction.Analyzers/EricksonLopez.Transaction.Analyzers.csproj" />
     <Project Path="src/EricksonLopez.Transaction.Dapper/EricksonLopez.Transaction.Dapper.csproj" />
     <Project Path="src/EricksonLopez.Transaction.PostgreSql/EricksonLopez.Transaction.PostgreSql.csproj" />
     <Project Path="src/EricksonLopez.Transaction.SqlServer/EricksonLopez.Transaction.SqlServer.csproj" />
     <Project Path="src/EricksonLopez.Transaction.MySql/EricksonLopez.Transaction.MySql.csproj" />
+    <Project Path="src/EricksonLopez.Transaction.EntityFrameworkCore/EricksonLopez.Transaction.EntityFrameworkCore.csproj" />
     <Project Path="src/EricksonLopez.Transaction.MariaDb/EricksonLopez.Transaction.MariaDb.csproj" />
     <Project Path="src/EricksonLopez.Transaction.Oracle/EricksonLopez.Transaction.Oracle.csproj" />
     <Project Path="src/EricksonLopez.Transaction.Sqlite/EricksonLopez.Transaction.Sqlite.csproj" />
+    <Project Path="src/EricksonLopez.Transaction.Resilience/EricksonLopez.Transaction.Resilience.csproj" />
     <Project Path="src/EricksonLopez.Transaction.Result/EricksonLopez.Transaction.Result.csproj" />
     <Project Path="src/EricksonLopez.Transaction.Mediator/EricksonLopez.Transaction.Mediator.csproj" />
     <Project Path="src/EricksonLopez.Transaction.Testing/EricksonLopez.Transaction.Testing.csproj" />
@@ -27,9 +30,13 @@
     <Project Path="tests/EricksonLopez.Transaction.Mediator.Tests/EricksonLopez.Transaction.Mediator.Tests.csproj" />
     <Project Path="tests/EricksonLopez.Transaction.Testing.Tests/EricksonLopez.Transaction.Testing.Tests.csproj" />
     <Project Path="tests/EricksonLopez.Transaction.ArchitectureTests/EricksonLopez.Transaction.ArchitectureTests.csproj" />
+    <Project Path="tests/EricksonLopez.Transaction.EntityFrameworkCore.Tests/EricksonLopez.Transaction.EntityFrameworkCore.Tests.csproj" />
     <Project Path="tests/EricksonLopez.Transaction.IntegrationTests/EricksonLopez.Transaction.IntegrationTests.csproj" />
+    <Project Path="tests/EricksonLopez.Transaction.Analyzers.Tests/EricksonLopez.Transaction.Analyzers.Tests.csproj" />
+    <Project Path="tests/EricksonLopez.Transaction.Resilience.Tests/EricksonLopez.Transaction.Resilience.Tests.csproj" />
     <Project Path="tests/EricksonLopez.Transaction.AotSmokeTest/EricksonLopez.Transaction.AotSmokeTest.csproj" />
   </Folder>
+
   <Folder Name="/samples/">
     <Project Path="samples/Showcase/EricksonLopez.Transaction.Showcase.csproj" />
   </Folder>

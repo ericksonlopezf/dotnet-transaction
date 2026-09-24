@@ -3,6 +3,9 @@
 ## Status
 Accepted
 
+## Date
+2026-09-04
+
 ## Context
 When executing SQL with Dapper in high-throughput applications, developers frequently forget to pass the `IDbTransaction` or `CancellationToken` to Dapper query methods, causing queries to execute on the connection outside the transaction or ignoring request timeouts.
 

@@ -232,6 +232,28 @@ public sealed class Level8_Customization : ILevel
             Console.WriteLine($"       Caught ExceptionToThrowOnCommit: '{ex.Message}'");
         }
 
+        // ─── 5. Custom IDatabaseDialect Implementation ───────────────────────────
+
+        Console.WriteLine("\n[5] Custom IDatabaseDialect Demonstration (Pluggable Engine Syntax):");
+        var customDialect = new CustomShowcaseDialect();
+        var customManager = new TransactionManager(syncFactory, null, [customDialect]);
+
+        await customManager.ExecuteAsync(async context =>
+        {
+            Console.WriteLine($"  -> Executed transaction with custom IDatabaseDialect registered.");
+            Console.WriteLine($"  -> Savepoint SQL generated: '{customDialect.GetSavepointCreationSql("sp_test")}'");
+            Console.WriteLine($"  -> Rollback SQL generated:  '{customDialect.GetSavepointRollbackSql("sp_test")}'");
+            Console.WriteLine($"  -> Release SQL generated:   '{customDialect.GetSavepointReleaseSql("sp_test")}'");
+        }, TransactionOptions.Default, cancellationToken);
+
+        // ─── 6. IsRollbackOnly & SetRollbackOnly Lifecycle Inspection ────────────
+
+        Console.WriteLine("\n[6] ITransactionContext.IsRollbackOnly & SetRollbackOnly Inspection:");
+        var fakeCtxRollback = new FakeTransactionContext();
+        Console.WriteLine($"  -> Initial IsRollbackOnly: {fakeCtxRollback.IsRollbackOnly}");
+        fakeCtxRollback.SetRollbackOnly("Showcase manual business abort.");
+        Console.WriteLine($"  -> After SetRollbackOnly:  {fakeCtxRollback.IsRollbackOnly}");
+
         bool allVerified = enlistmentTracker.BeforeCommitCalled
             && enlistmentTracker.AfterCommitCalled
             // rollbackEnlistment: user exception causes auto-rollback (AfterRollbackAsync), NOT OnExceptionAsync
@@ -239,7 +261,8 @@ public sealed class Level8_Customization : ILevel
             && !rollbackEnlistment.OnExceptionCalled // Verified: user exceptions do NOT trigger OnExceptionAsync
             && fakeManager.StartedTransactions.Count == 1
             && firstTx.CommitCount == 1
-            && fakeCtx.CreatedSavepoints.Count == 2;
+            && fakeCtx.CreatedSavepoints.Count == 2
+            && fakeCtxRollback.IsRollbackOnly;
 
         if (allVerified)
         {
@@ -317,4 +340,19 @@ public sealed class Level8_Customization : ILevel
             });
         }
     }
+
+    private sealed class CustomShowcaseDialect : IDatabaseDialect
+    {
+        public bool CanHandle(DbConnection connection) => connection is SqliteConnection;
+
+        public Task ApplyReadOnlyModeAsync(DbConnection connection, DbTransaction transaction, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public string GetSavepointCreationSql(string savepointName) => $"SAVEPOINT {savepointName};";
+
+        public string GetSavepointRollbackSql(string savepointName) => $"ROLLBACK TO {savepointName};";
+
+        public string? GetSavepointReleaseSql(string savepointName) => $"RELEASE SAVEPOINT {savepointName};";
+    }
 }
+

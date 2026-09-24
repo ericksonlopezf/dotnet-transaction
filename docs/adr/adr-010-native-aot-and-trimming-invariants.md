@@ -3,6 +3,9 @@
 ## Status
 Accepted
 
+## Date
+2026-09-04
+
 ## Context
 .NET 10 provides first-class Native AOT (Ahead-of-Time) compilation and trimming capabilities for ultra-fast startup and minimal memory footprint in microservices and serverless workloads. Libraries that rely on unannotated runtime reflection (`Type.GetType()`, unbounded `MakeGenericType`, or dynamic code emission) generate IL trimmer warnings (`IL2026`, `IL3050`) and fail when compiled to Native AOT.
 

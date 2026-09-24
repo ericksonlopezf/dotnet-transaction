@@ -7,7 +7,7 @@
     <AssemblyName>EricksonLopez.Transaction.Testing</AssemblyName>
     <Description>Testing utilities, fake transaction managers, spy contexts, and chaos simulators for EricksonLopez.Transaction.</Description>
     <PackageId>EricksonLopez.Transaction.Testing</PackageId>
-    <PackageTags>$(CommonPackageTags);testing;test-doubles;fakes;mocks;unit-testing;in-memory</PackageTags>
+    <PackageTags>$(CommonPackageTags);unit-testing;test-doubles;fakes;mocks;in-memory;native-aot</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

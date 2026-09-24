@@ -90,9 +90,9 @@ public sealed class TransactionContextTests
         var dbTx = Substitute.For<DbTransaction>();
         var sm = new TransactionStateMachine();
 
-        Action act1 = () => _ = new TransactionContext(Guid.NewGuid(), null!, dbTx, TransactionIsolationLevel.ReadCommitted, sm, CancellationToken.None);
-        Action act2 = () => _ = new TransactionContext(Guid.NewGuid(), dbConn, null!, TransactionIsolationLevel.ReadCommitted, sm, CancellationToken.None);
-        Action act3 = () => _ = new TransactionContext(Guid.NewGuid(), dbConn, dbTx, TransactionIsolationLevel.ReadCommitted, null!, CancellationToken.None);
+        Action act1 = () => _ = new TransactionContext(Guid.NewGuid(), null!, dbTx, TransactionIsolationLevel.ReadCommitted, sm, EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance, CancellationToken.None);
+        Action act2 = () => _ = new TransactionContext(Guid.NewGuid(), dbConn, null!, TransactionIsolationLevel.ReadCommitted, sm, EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance, CancellationToken.None);
+        Action act3 = () => _ = new TransactionContext(Guid.NewGuid(), dbConn, dbTx, TransactionIsolationLevel.ReadCommitted, null!, EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance, CancellationToken.None);
 
         act1.Should().Throw<ArgumentNullException>();
         act2.Should().Throw<ArgumentNullException>();
@@ -107,7 +107,7 @@ public sealed class TransactionContextTests
         var dbTx = Substitute.For<DbTransaction>();
         var sm = new TransactionStateMachine(TransactionState.Active);
 
-        var context = new TransactionContext(txId, dbConn, dbTx, TransactionIsolationLevel.Serializable, sm, CancellationToken.None);
+        var context = new TransactionContext(txId, dbConn, dbTx, TransactionIsolationLevel.Serializable, sm, EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance, CancellationToken.None);
 
         context.TransactionId.Should().Be(txId);
         context.Connection.Should().BeSameAs(dbConn);
@@ -127,7 +127,7 @@ public sealed class TransactionContextTests
         var dbConn = Substitute.For<DbConnection>();
         var dbTx = Substitute.For<DbTransaction>();
         var sm = new TransactionStateMachine();
-        var context = new TransactionContext(Guid.NewGuid(), dbConn, dbTx, TransactionIsolationLevel.ReadCommitted, sm, CancellationToken.None);
+        var context = new TransactionContext(Guid.NewGuid(), dbConn, dbTx, TransactionIsolationLevel.ReadCommitted, sm, EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance, CancellationToken.None);
 
         Action nullAct = () => context.Enlist(null!);
         nullAct.Should().Throw<ArgumentNullException>();
@@ -149,7 +149,7 @@ public sealed class TransactionContextTests
         var dbConn = Substitute.For<DbConnection>();
         var dbTx = Substitute.For<DbTransaction>();
         var sm = new TransactionStateMachine();
-        var context = new TransactionContext(Guid.NewGuid(), dbConn, dbTx, TransactionIsolationLevel.ReadCommitted, sm, CancellationToken.None);
+        var context = new TransactionContext(Guid.NewGuid(), dbConn, dbTx, TransactionIsolationLevel.ReadCommitted, sm, EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance, CancellationToken.None);
 
         Func<Task> act = () => context.CreateSavepointAsync(name!, CancellationToken.None);
 
@@ -169,7 +169,7 @@ public sealed class TransactionContextTests
         var dbConn = Substitute.For<DbConnection>();
         var dbTx = Substitute.For<DbTransaction>();
         var sm = new TransactionStateMachine();
-        var context = new TransactionContext(Guid.NewGuid(), dbConn, dbTx, TransactionIsolationLevel.ReadCommitted, sm, CancellationToken.None);
+        var context = new TransactionContext(Guid.NewGuid(), dbConn, dbTx, TransactionIsolationLevel.ReadCommitted, sm, EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance, CancellationToken.None);
 
         Func<Task> act = () => context.CreateSavepointAsync(name, CancellationToken.None);
 
@@ -184,7 +184,7 @@ public sealed class TransactionContextTests
         var dbConn = Substitute.For<DbConnection>();
         var dbTx = Substitute.For<DbTransaction>();
         var sm = new TransactionStateMachine();
-        var context = new TransactionContext(Guid.NewGuid(), dbConn, dbTx, TransactionIsolationLevel.ReadCommitted, sm, CancellationToken.None);
+        var context = new TransactionContext(Guid.NewGuid(), dbConn, dbTx, TransactionIsolationLevel.ReadCommitted, sm, EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance, CancellationToken.None);
 
         Func<Task> act = () => context.CreateSavepointAsync("sp invalid", CancellationToken.None);
 
@@ -209,7 +209,7 @@ public sealed class TransactionContextTests
         var dbConn = Substitute.For<DbConnection>();
         var dbTx = Substitute.For<DbTransaction>();
         var sm = new TransactionStateMachine();
-        var context = new TransactionContext(Guid.NewGuid(), dbConn, dbTx, TransactionIsolationLevel.ReadCommitted, sm, CancellationToken.None);
+        var context = new TransactionContext(Guid.NewGuid(), dbConn, dbTx, TransactionIsolationLevel.ReadCommitted, sm, EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance, CancellationToken.None);
 
         ISavepoint sp = await context.CreateSavepointAsync("sp_native", CancellationToken.None);
 
@@ -235,7 +235,7 @@ public sealed class TransactionContextTests
         var conn = new MockDbConnection();
         var tx = new SaveThrowingTransaction(conn);
         var sm = new TransactionStateMachine();
-        var context = new TransactionContext(Guid.NewGuid(), conn, tx, TransactionIsolationLevel.ReadCommitted, sm, CancellationToken.None);
+        var context = new TransactionContext(Guid.NewGuid(), conn, tx, TransactionIsolationLevel.ReadCommitted, sm, EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance, CancellationToken.None);
 
         ISavepoint sp = await context.CreateSavepointAsync("sp_fallback", CancellationToken.None);
 
@@ -254,7 +254,7 @@ public sealed class TransactionContextTests
         var dbConn = Substitute.For<DbConnection>();
         var dbTx = Substitute.For<DbTransaction>();
         var sm = new TransactionStateMachine();
-        var context = new TransactionContext(Guid.NewGuid(), dbConn, dbTx, TransactionIsolationLevel.ReadCommitted, sm, CancellationToken.None);
+        var context = new TransactionContext(Guid.NewGuid(), dbConn, dbTx, TransactionIsolationLevel.ReadCommitted, sm, EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance, CancellationToken.None);
 
         var failingHook = Substitute.For<ITransactionEnlistment>();
         failingHook.When(h => h.AfterRollbackAsync(Arg.Any<ITransactionContext>(), Arg.Any<CancellationToken>()))
@@ -290,7 +290,7 @@ public sealed class TransactionContextTests
         var dbConn = Substitute.For<DbConnection>();
         var dbTx = Substitute.For<DbTransaction>();
         var sm = new TransactionStateMachine();
-        var context = new TransactionContext(Guid.NewGuid(), dbConn, dbTx, TransactionIsolationLevel.ReadCommitted, sm, CancellationToken.None);
+        var context = new TransactionContext(Guid.NewGuid(), dbConn, dbTx, TransactionIsolationLevel.ReadCommitted, sm, EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance, CancellationToken.None);
 
         await context.DisposeAsync();
 

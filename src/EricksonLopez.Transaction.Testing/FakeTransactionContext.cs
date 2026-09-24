@@ -60,8 +60,17 @@ public sealed class FakeTransactionContext : ITransactionContext
     /// <inheritdoc/>
     public IReadOnlyList<ITransactionEnlistment> Enlistments => _enlistments.ToArray();
 
+    /// <inheritdoc/>
+    public bool IsRollbackOnly { get; set; }
+
+    /// <inheritdoc/>
+    public void SetRollbackOnly(string reason)
+    {
+        IsRollbackOnly = true;
+    }
+
     /// <summary>
-    /// Gets the list of names of savepoints created on this context.
+    /// Gets the read-only collection of savepoint names created within this context.
     /// </summary>
     public IReadOnlyList<string> CreatedSavepoints => _createdSavepoints.ToArray();
 

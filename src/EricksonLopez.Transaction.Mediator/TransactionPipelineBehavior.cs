@@ -9,26 +9,24 @@ using EricksonLopez.Result;
 namespace EricksonLopez.Transaction.Mediator;
 
 /// <summary>
-/// Pipeline behavior that executes mediator commands within an automatic database transaction boundary.
-/// Automatically commits on success and rolls back when an unhandled exception is thrown or when
-/// a functional failure (<see cref="IResultOutcome.IsFailure"/>) is returned.
+/// Encapsulates mediator command execution within an automatic database transaction boundary,
+/// committing on success and rolling back when an unhandled exception is thrown or when a functional
+/// failure (<see cref="IResultOutcome.IsFailure"/>) is returned.
 /// </summary>
-/// <typeparam name="TRequest">The type of request.</typeparam>
-/// <typeparam name="TResponse">The type of response.</typeparam>
+/// <typeparam name="TRequest">The type of transactional command request being processed.</typeparam>
+/// <typeparam name="TResponse">The type of response returned by the command handler.</typeparam>
 public sealed class TransactionPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : ITransactionalCommand
 {
-    private static readonly bool IsTransactional =
-        typeof(ITransactionalCommand).IsAssignableFrom(typeof(TRequest));
-
-
     private readonly ITransactionManager _transactionManager;
     private readonly IEnumerable<ITransactionEnlistment> _enlistments;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TransactionPipelineBehavior{TRequest, TResponse}"/> class.
     /// </summary>
-    /// <param name="transactionManager">The transaction manager instance.</param>
-    /// <param name="enlistments">Optional collection of transaction enlistment lifecycle participants.</param>
+    /// <param name="transactionManager">The transaction coordinator instance.</param>
+    /// <param name="enlistments">An optional collection of transaction enlistment lifecycle participants.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="transactionManager"/> is <see langword="null"/></exception>
     public TransactionPipelineBehavior(
         ITransactionManager transactionManager,
         IEnumerable<ITransactionEnlistment>? enlistments = null)
@@ -44,11 +42,6 @@ public sealed class TransactionPipelineBehavior<TRequest, TResponse> : IPipeline
         CancellationToken cancellationToken)
         where TNext : struct, INext<TResponse>
     {
-        if (!IsTransactional)
-        {
-            return await next.InvokeAsync().ConfigureAwait(false);
-        }
-
         var options = request is ITransactionalCommandOptions configurable
             ? configurable.TransactionOptions
             : null;
@@ -57,9 +50,12 @@ public sealed class TransactionPipelineBehavior<TRequest, TResponse> : IPipeline
             .BeginAsync(options, cancellationToken)
             .ConfigureAwait(false);
 
-        foreach (var enlistment in _enlistments)
+        if (options?.NestedBehavior != NestedTransactionBehavior.Suppress)
         {
-            transaction.Context.Enlist(enlistment);
+            foreach (var enlistment in _enlistments)
+            {
+                transaction.Context.Enlist(enlistment);
+            }
         }
 
         TResponse response;
@@ -67,9 +63,20 @@ public sealed class TransactionPipelineBehavior<TRequest, TResponse> : IPipeline
         {
             response = await next.InvokeAsync().ConfigureAwait(false);
         }
-        catch
+        catch (Exception primaryEx)
         {
-            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception rollbackEx)
+            {
+                throw new AggregateException(
+                    "Transaction rollback failed following an unhandled command execution error.",
+                    primaryEx,
+                    rollbackEx);
+            }
+
             throw;
         }
 

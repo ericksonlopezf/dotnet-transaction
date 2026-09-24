@@ -9,11 +9,13 @@
 `EricksonLopez.Transaction` defines a specialized, strongly typed exception hierarchy under [`EricksonLopez.Transaction.Exceptions`](file:///d:/DevData/ericksonlopez.dev/dotnet-transaction/src/EricksonLopez.Transaction.Abstractions/Exceptions/):
 
 ```text
-TransactionException (Base)
-  ├── TransactionStateException        (Attempted illegal state transition, e.g. Commit on Disposed)
-  ├── TransactionCommitException       (Physical commit failed; contains IsAmbiguous flag)
-  ├── TransactionRollbackException     (Teardown rollback failed due to connection drop)
-  └── TransactionTimeoutException      (Operation exceeded configured TransactionOptions.Timeout)
+Exception
+└── TransactionException (Base — catches all library-managed faults)
+    ├── TransactionCommitException       (Physical commit failed; IsAmbiguous flag for network uncertainty)
+    ├── TransactionPostCommitException   (DB committed durably but post-commit hook threw — do NOT rollback)
+    ├── TransactionRollbackException     (Teardown rollback failed due to connection drop)
+    ├── TransactionStateException        (Illegal lifecycle state transition — ActualState, AttemptedOperation)
+    └── TransactionTimeoutException      (Execution exceeded TransactionOptions.Timeout — Timeout property)
 ```
 
 ---

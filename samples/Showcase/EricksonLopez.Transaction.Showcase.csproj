@@ -3,6 +3,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <TargetFrameworks></TargetFrameworks>
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>EricksonLopez.Transaction.Showcase</RootNamespace>
     <AssemblyName>EricksonLopez.Transaction.Showcase</AssemblyName>
@@ -25,6 +26,9 @@
     <ProjectReference Include="..\..\src\EricksonLopez.Transaction.MariaDb\EricksonLopez.Transaction.MariaDb.csproj" />
     <ProjectReference Include="..\..\src\EricksonLopez.Transaction.Oracle\EricksonLopez.Transaction.Oracle.csproj" />
     <ProjectReference Include="..\..\src\EricksonLopez.Transaction.Sqlite\EricksonLopez.Transaction.Sqlite.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.EntityFrameworkCore\EricksonLopez.Transaction.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.Mediator\EricksonLopez.Transaction.Mediator.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Transaction.Resilience\EricksonLopez.Transaction.Resilience.csproj" />
   </ItemGroup>
 
   <ItemGroup>

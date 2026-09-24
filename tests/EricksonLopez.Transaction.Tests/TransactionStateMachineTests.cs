@@ -104,8 +104,7 @@ public sealed class TransactionStateMachineTests
     [Theory]
     [InlineData(TransactionState.Created)]
     [InlineData(TransactionState.Active)]
-    [InlineData(TransactionState.Committed)]
-    public void TransitionToFailed_FromCreatedActiveOrCommitted_ShouldSucceed(TransactionState state)
+    public void TransitionToFailed_FromCreatedOrActive_ShouldSucceed(TransactionState state)
     {
         var machine = new TransactionStateMachine(state);
         machine.TransitionToFailed();
@@ -113,10 +112,11 @@ public sealed class TransactionStateMachineTests
     }
 
     [Theory]
+    [InlineData(TransactionState.Committed)]
     [InlineData(TransactionState.Failed)]
     [InlineData(TransactionState.RolledBack)]
     [InlineData(TransactionState.Disposed)]
-    public void TransitionToFailed_WhenAlreadyFailedRolledBackOrDisposed_ShouldBeIdempotentNoOp(TransactionState state)
+    public void TransitionToFailed_WhenTerminalOrFailed_ShouldBeIdempotentNoOp(TransactionState state)
     {
         var machine = new TransactionStateMachine(state);
         machine.TransitionToFailed();

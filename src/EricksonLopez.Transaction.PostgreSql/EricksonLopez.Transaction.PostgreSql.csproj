@@ -7,7 +7,7 @@
     <AssemblyName>EricksonLopez.Transaction.PostgreSql</AssemblyName>
     <Description>PostgreSQL provider adapters, error classifiers, and savepoint handlers for EricksonLopez.Transaction.</Description>
     <PackageId>EricksonLopez.Transaction.PostgreSql</PackageId>
-    <PackageTags>$(CommonPackageTags);postgresql;postgres;npgsql;savepoints;sqlstate;deadlock-detection;database-provider</PackageTags>
+    <PackageTags>$(CommonPackageTags);postgresql;npgsql;savepoint;sqlstate;deadlock-detection;database-provider;native-aot</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
