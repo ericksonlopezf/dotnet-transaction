@@ -25,7 +25,7 @@ public static class TransactionDapperExtensions
     /// <param name="cancellationToken">A token that can be used to cancel the asynchronous operation.</param>
     /// <returns>A configured <see cref="CommandDefinition"/> bound to the active transaction.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="context"/> is <see langword="null"/></exception>
-    /// <exception cref="ArgumentException"><paramref name="commandText"/> is <see langword="null"/> or empty</exception>
+    /// <exception cref="ArgumentException"><paramref name="commandText"/> is <see langword="null"/> or whitespace</exception>
     public static CommandDefinition AsCommand(
         this ITransactionContext context,
         string commandText,
@@ -38,9 +38,13 @@ public static class TransactionDapperExtensions
         ArgumentNullException.ThrowIfNull(context);
         ArgumentException.ThrowIfNullOrWhiteSpace(commandText);
 
-        CancellationToken combinedToken = cancellationToken.CanBeCanceled
-            ? CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken, cancellationToken).Token
-            : context.CancellationToken;
+        CancellationToken combinedToken = (!cancellationToken.CanBeCanceled || cancellationToken == context.CancellationToken)
+            ? context.CancellationToken
+            : (!context.CancellationToken.CanBeCanceled
+                ? cancellationToken
+                : (context.CancellationToken.IsCancellationRequested
+                    ? context.CancellationToken
+                    : cancellationToken));
 
         return new CommandDefinition(
             commandText: commandText,
@@ -50,6 +54,34 @@ public static class TransactionDapperExtensions
             commandType: commandType,
             flags: flags,
             cancellationToken: combinedToken);
+    }
+
+    private static (CancellationToken Token, CancellationTokenSource? LinkedCts) ResolveToken(
+        ITransactionContext context,
+        CancellationToken cancellationToken)
+    {
+        if (!cancellationToken.CanBeCanceled || cancellationToken == context.CancellationToken)
+        {
+            return (context.CancellationToken, null);
+        }
+
+        if (!context.CancellationToken.CanBeCanceled)
+        {
+            return (cancellationToken, null);
+        }
+
+        if (context.CancellationToken.IsCancellationRequested)
+        {
+            return (context.CancellationToken, null);
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return (cancellationToken, null);
+        }
+
+        CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken, cancellationToken);
+        return (linkedCts.Token, linkedCts);
     }
 
     /// <summary>
@@ -62,7 +94,8 @@ public static class TransactionDapperExtensions
     /// <param name="commandType">The command type interpretation, or <see langword="null"/> for default.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the asynchronous operation.</param>
     /// <returns>A task representing the asynchronous operation. The task result contains the number of rows affected.</returns>
-    public static Task<int> ExecuteAsync(
+    /// <exception cref="ArgumentNullException"><paramref name="context"/> is <see langword="null"/></exception>
+    public static async Task<int> ExecuteAsync(
         this ITransactionContext context,
         string sql,
         object? param = null,
@@ -70,8 +103,25 @@ public static class TransactionDapperExtensions
         CommandType? commandType = null,
         CancellationToken cancellationToken = default)
     {
-        CommandDefinition command = context.AsCommand(sql, param, commandType, CommandFlags.Buffered, commandTimeout, cancellationToken);
-        return context.Connection.ExecuteAsync(command);
+        ArgumentNullException.ThrowIfNull(context);
+        var (token, linkedCts) = ResolveToken(context, cancellationToken);
+        try
+        {
+            CommandDefinition command = new(
+                commandText: sql,
+                parameters: param,
+                transaction: context.Transaction,
+                commandTimeout: commandTimeout,
+                commandType: commandType,
+                flags: CommandFlags.Buffered,
+                cancellationToken: token);
+
+            return await context.Connection.ExecuteAsync(command).ConfigureAwait(false);
+        }
+        finally
+        {
+            linkedCts?.Dispose();
+        }
     }
 
     /// <summary>
@@ -85,7 +135,8 @@ public static class TransactionDapperExtensions
     /// <param name="commandType">The command type interpretation, or <see langword="null"/> for default.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the asynchronous operation.</param>
     /// <returns>A task representing the asynchronous operation. The task result contains an enumerable sequence of mapped entities.</returns>
-    public static Task<IEnumerable<T>> QueryAsync<T>(
+    /// <exception cref="ArgumentNullException"><paramref name="context"/> is <see langword="null"/></exception>
+    public static async Task<IEnumerable<T>> QueryAsync<T>(
         this ITransactionContext context,
         string sql,
         object? param = null,
@@ -93,8 +144,25 @@ public static class TransactionDapperExtensions
         CommandType? commandType = null,
         CancellationToken cancellationToken = default)
     {
-        CommandDefinition command = context.AsCommand(sql, param, commandType, CommandFlags.Buffered, commandTimeout, cancellationToken);
-        return context.Connection.QueryAsync<T>(command);
+        ArgumentNullException.ThrowIfNull(context);
+        var (token, linkedCts) = ResolveToken(context, cancellationToken);
+        try
+        {
+            CommandDefinition command = new(
+                commandText: sql,
+                parameters: param,
+                transaction: context.Transaction,
+                commandTimeout: commandTimeout,
+                commandType: commandType,
+                flags: CommandFlags.Buffered,
+                cancellationToken: token);
+
+            return await context.Connection.QueryAsync<T>(command).ConfigureAwait(false);
+        }
+        finally
+        {
+            linkedCts?.Dispose();
+        }
     }
 
     /// <summary>
@@ -108,7 +176,8 @@ public static class TransactionDapperExtensions
     /// <param name="commandType">The command type interpretation, or <see langword="null"/> for default.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the asynchronous operation.</param>
     /// <returns>A task representing the asynchronous operation. The task result contains the single matching element, or the default value if none was found.</returns>
-    public static Task<T?> QuerySingleOrDefaultAsync<T>(
+    /// <exception cref="ArgumentNullException"><paramref name="context"/> is <see langword="null"/></exception>
+    public static async Task<T?> QuerySingleOrDefaultAsync<T>(
         this ITransactionContext context,
         string sql,
         object? param = null,
@@ -116,8 +185,25 @@ public static class TransactionDapperExtensions
         CommandType? commandType = null,
         CancellationToken cancellationToken = default)
     {
-        CommandDefinition command = context.AsCommand(sql, param, commandType, CommandFlags.Buffered, commandTimeout, cancellationToken);
-        return context.Connection.QuerySingleOrDefaultAsync<T>(command);
+        ArgumentNullException.ThrowIfNull(context);
+        var (token, linkedCts) = ResolveToken(context, cancellationToken);
+        try
+        {
+            CommandDefinition command = new(
+                commandText: sql,
+                parameters: param,
+                transaction: context.Transaction,
+                commandTimeout: commandTimeout,
+                commandType: commandType,
+                flags: CommandFlags.Buffered,
+                cancellationToken: token);
+
+            return await context.Connection.QuerySingleOrDefaultAsync<T>(command).ConfigureAwait(false);
+        }
+        finally
+        {
+            linkedCts?.Dispose();
+        }
     }
 
     /// <summary>
@@ -131,7 +217,8 @@ public static class TransactionDapperExtensions
     /// <param name="commandType">The command type interpretation, or <see langword="null"/> for default.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the asynchronous operation.</param>
     /// <returns>A task representing the asynchronous operation. The task result contains the first matching element, or the default value if none was found.</returns>
-    public static Task<T?> QueryFirstOrDefaultAsync<T>(
+    /// <exception cref="ArgumentNullException"><paramref name="context"/> is <see langword="null"/></exception>
+    public static async Task<T?> QueryFirstOrDefaultAsync<T>(
         this ITransactionContext context,
         string sql,
         object? param = null,
@@ -139,8 +226,25 @@ public static class TransactionDapperExtensions
         CommandType? commandType = null,
         CancellationToken cancellationToken = default)
     {
-        CommandDefinition command = context.AsCommand(sql, param, commandType, CommandFlags.Buffered, commandTimeout, cancellationToken);
-        return context.Connection.QueryFirstOrDefaultAsync<T>(command);
+        ArgumentNullException.ThrowIfNull(context);
+        var (token, linkedCts) = ResolveToken(context, cancellationToken);
+        try
+        {
+            CommandDefinition command = new(
+                commandText: sql,
+                parameters: param,
+                transaction: context.Transaction,
+                commandTimeout: commandTimeout,
+                commandType: commandType,
+                flags: CommandFlags.Buffered,
+                cancellationToken: token);
+
+            return await context.Connection.QueryFirstOrDefaultAsync<T>(command).ConfigureAwait(false);
+        }
+        finally
+        {
+            linkedCts?.Dispose();
+        }
     }
 
     /// <summary>
@@ -154,7 +258,8 @@ public static class TransactionDapperExtensions
     /// <param name="commandType">The command type interpretation, or <see langword="null"/> for default.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the asynchronous operation.</param>
     /// <returns>A task representing the asynchronous operation. The task result contains the scalar value, or the default value if the result set is empty.</returns>
-    public static Task<T?> ExecuteScalarAsync<T>(
+    /// <exception cref="ArgumentNullException"><paramref name="context"/> is <see langword="null"/></exception>
+    public static async Task<T?> ExecuteScalarAsync<T>(
         this ITransactionContext context,
         string sql,
         object? param = null,
@@ -162,8 +267,25 @@ public static class TransactionDapperExtensions
         CommandType? commandType = null,
         CancellationToken cancellationToken = default)
     {
-        CommandDefinition command = context.AsCommand(sql, param, commandType, CommandFlags.Buffered, commandTimeout, cancellationToken);
-        return context.Connection.ExecuteScalarAsync<T>(command);
+        ArgumentNullException.ThrowIfNull(context);
+        var (token, linkedCts) = ResolveToken(context, cancellationToken);
+        try
+        {
+            CommandDefinition command = new(
+                commandText: sql,
+                parameters: param,
+                transaction: context.Transaction,
+                commandTimeout: commandTimeout,
+                commandType: commandType,
+                flags: CommandFlags.Buffered,
+                cancellationToken: token);
+
+            return await context.Connection.ExecuteScalarAsync<T>(command).ConfigureAwait(false);
+        }
+        finally
+        {
+            linkedCts?.Dispose();
+        }
     }
 
     /// <summary>
@@ -176,6 +298,7 @@ public static class TransactionDapperExtensions
     /// <param name="commandType">The command type interpretation, or <see langword="null"/> for default.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the asynchronous operation.</param>
     /// <returns>A task representing the asynchronous operation. The task result contains a <see cref="SqlMapper.GridReader"/> for reading multiple results.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="context"/> is <see langword="null"/></exception>
     public static Task<SqlMapper.GridReader> QueryMultipleAsync(
         this ITransactionContext context,
         string sql,
@@ -198,6 +321,7 @@ public static class TransactionDapperExtensions
     /// <param name="commandType">The command type interpretation, or <see langword="null"/> for default.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the asynchronous operation.</param>
     /// <returns>A task representing the asynchronous operation. The task result contains the <see cref="IDataReader"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="context"/> is <see langword="null"/></exception>
     public static async Task<IDataReader> ExecuteReaderAsync(
         this ITransactionContext context,
         string sql,
@@ -207,7 +331,7 @@ public static class TransactionDapperExtensions
         CancellationToken cancellationToken = default)
     {
         CommandDefinition command = context.AsCommand(sql, param, commandType, CommandFlags.Buffered, commandTimeout, cancellationToken);
-        return await context.Connection.ExecuteReaderAsync(command);
+        return await context.Connection.ExecuteReaderAsync(command).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -221,7 +345,8 @@ public static class TransactionDapperExtensions
     /// <param name="commandType">The command type interpretation, or <see langword="null"/> for default.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the asynchronous operation.</param>
     /// <returns>A task representing the asynchronous operation. The task result contains the single matching element.</returns>
-    public static Task<T> QuerySingleAsync<T>(
+    /// <exception cref="ArgumentNullException"><paramref name="context"/> is <see langword="null"/></exception>
+    public static async Task<T> QuerySingleAsync<T>(
         this ITransactionContext context,
         string sql,
         object? param = null,
@@ -229,8 +354,25 @@ public static class TransactionDapperExtensions
         CommandType? commandType = null,
         CancellationToken cancellationToken = default)
     {
-        CommandDefinition command = context.AsCommand(sql, param, commandType, CommandFlags.Buffered, commandTimeout, cancellationToken);
-        return context.Connection.QuerySingleAsync<T>(command);
+        ArgumentNullException.ThrowIfNull(context);
+        var (token, linkedCts) = ResolveToken(context, cancellationToken);
+        try
+        {
+            CommandDefinition command = new(
+                commandText: sql,
+                parameters: param,
+                transaction: context.Transaction,
+                commandTimeout: commandTimeout,
+                commandType: commandType,
+                flags: CommandFlags.Buffered,
+                cancellationToken: token);
+
+            return await context.Connection.QuerySingleAsync<T>(command).ConfigureAwait(false);
+        }
+        finally
+        {
+            linkedCts?.Dispose();
+        }
     }
 
     /// <summary>
@@ -244,7 +386,8 @@ public static class TransactionDapperExtensions
     /// <param name="commandType">The command type interpretation, or <see langword="null"/> for default.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the asynchronous operation.</param>
     /// <returns>A task representing the asynchronous operation. The task result contains the first matching element.</returns>
-    public static Task<T> QueryFirstAsync<T>(
+    /// <exception cref="ArgumentNullException"><paramref name="context"/> is <see langword="null"/></exception>
+    public static async Task<T> QueryFirstAsync<T>(
         this ITransactionContext context,
         string sql,
         object? param = null,
@@ -252,7 +395,24 @@ public static class TransactionDapperExtensions
         CommandType? commandType = null,
         CancellationToken cancellationToken = default)
     {
-        CommandDefinition command = context.AsCommand(sql, param, commandType, CommandFlags.Buffered, commandTimeout, cancellationToken);
-        return context.Connection.QueryFirstAsync<T>(command);
+        ArgumentNullException.ThrowIfNull(context);
+        var (token, linkedCts) = ResolveToken(context, cancellationToken);
+        try
+        {
+            CommandDefinition command = new(
+                commandText: sql,
+                parameters: param,
+                transaction: context.Transaction,
+                commandTimeout: commandTimeout,
+                commandType: commandType,
+                flags: CommandFlags.Buffered,
+                cancellationToken: token);
+
+            return await context.Connection.QueryFirstAsync<T>(command).ConfigureAwait(false);
+        }
+        finally
+        {
+            linkedCts?.Dispose();
+        }
     }
 }

@@ -1,4 +1,4 @@
-# Level 09: Multi-DB Dialect Providers & Connection Factories
+# Level 09: Multi-DB Dialect Providers, Factories & Mediator Attributes
 
 > **Level:** 09 | **Category:** Dialects | **Executable Reference:** [`Level9_Extensions.cs`](file:///d:/DevData/ericksonlopez.dev/dotnet-transaction/samples/Showcase/Levels/Level9_Extensions.cs)
 
@@ -45,8 +45,71 @@ builder.Services.AddSqliteTransaction("Data Source=app.db;");
 
 ## 3. Engine Capabilities & Savepoint Support Matrix
 
-- **PostgreSQL**: Full Savepoint support (`SAVEPOINT`, `ROLLBACK TO`, `RELEASE SAVEPOINT`), MVCC Snapshot isolation.
-- **SQL Server**: Savepoint support (`SAVEPOINT` / `ROLLBACK`), Snapshot isolation via tempdb row versioning.
-- **MySQL / MariaDB**: Savepoint support with InnoDB storage engine.
-- **Oracle**: Standard `SAVEPOINT` and `ROLLBACK TO SAVEPOINT`.
-- **SQLite**: Savepoint support in WAL mode (Savepoints function cleanly across transaction boundaries).
+| Engine | Savepoints | Read-Only Mode | Snapshot Isolation | Error Classifier |
+|---|---|---|---|---|
+| PostgreSQL | ✅ Full (`SAVEPOINT`/`ROLLBACK TO`/`RELEASE`) | ✅ `SET TRANSACTION READ ONLY` | ✅ MVCC | `PostgreSqlErrorClassifier` |
+| SQL Server | ✅ (`SAVE TRANSACTION`/`ROLLBACK`) | ❌ | ✅ tempdb row versioning | `SqlServerErrorClassifier` |
+| MySQL/MariaDB | ✅ InnoDB | ❌ | ❌ | `MySqlErrorClassifier` |
+| Oracle | ✅ (`SAVEPOINT`/`ROLLBACK TO SAVEPOINT`) | ❌ | ❌ | `OracleErrorClassifier` |
+| SQLite | ✅ WAL mode | ❌ | ❌ | `SqliteErrorClassifier` |
+
+---
+
+## 4. `TransactionalAttribute` — Reflection-Based Command Configuration
+
+`TransactionalAttribute` decorates a mediator command class to specify transaction isolation level and timeout declaratively. The `TransactionPipelineBehavior` reads this attribute at runtime.
+
+```csharp
+[Transactional(TransactionIsolationLevel.Serializable, TimeoutSeconds = 30)]
+public sealed record PlaceOrderCommand : ITransactionalCommand
+{
+    public Guid OrderId { get; init; }
+    public decimal Amount { get; init; }
+}
+```
+
+> **AOT Note:** `TransactionalAttribute` uses reflection (`CustomAttributeExtensions.GetCustomAttribute<T>`). In Native AOT scenarios where reflection is restricted, implement `ITransactionalCommandOptions` on your command record instead.
+
+---
+
+## 5. `ITransactionalCommandOptions` — AOT-Safe Alternative (No Reflection)
+
+```csharp
+public sealed record PlaceOrderCommand : ITransactionalCommand, ITransactionalCommandOptions
+{
+    public Guid OrderId { get; init; }
+    public decimal Amount { get; init; }
+
+    // TransactionPipelineBehavior reads this at compile-time — no reflection
+    public TransactionOptions TransactionOptions => new()
+    {
+        IsolationLevel = TransactionIsolationLevel.Serializable,
+        Timeout = TimeSpan.FromSeconds(30)
+    };
+}
+```
+
+**Comparison:**
+
+| Approach | AOT-Safe | Reflection-Free | Per-Instance Options |
+|---|---|---|---|
+| `TransactionalAttribute` | ❌ | ❌ | ❌ (class-level) |
+| `ITransactionalCommandOptions` | ✅ | ✅ | ✅ (instance-level) |
+
+---
+
+## 6. `TransactionPipelineBehavior` Registration
+
+```csharp
+services.AddTransactionPipelineBehavior();
+// Registers: services.AddTransient(typeof(IPipelineBehavior<,>), typeof(TransactionPipelineBehavior<,>))
+// Only activates for commands implementing ITransactionalCommand.
+```
+
+The behavior:
+1. Calls `ITransactionManager.BeginAsync()` with options from `ITransactionalCommandOptions` (or null for defaults)
+2. Executes enlistments on the transaction context
+3. Invokes the handler via `next.InvokeAsync()`
+4. If the response implements `IResultOutcome` and `IsFailure`, calls `RollbackAsync`
+5. Otherwise calls `CommitAsync`
+6. On unhandled exceptions, calls `RollbackAsync` and re-throws

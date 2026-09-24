@@ -38,6 +38,7 @@ public sealed class PhysicalTransactionTests : IDisposable
             _transaction,
             TransactionIsolationLevel.ReadCommitted,
             _stateMachine,
+            EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance,
             CancellationToken.None);
     }
 
@@ -417,7 +418,7 @@ public sealed class PhysicalTransactionTests : IDisposable
         var throwingTx = new ThrowingDisposeTransaction(throwingConn);
 
         var machine = new TransactionStateMachine(TransactionState.Committed);
-        var context = new TransactionContext(Guid.NewGuid(), throwingConn, throwingTx, TransactionIsolationLevel.ReadCommitted, machine, CancellationToken.None);
+        var context = new TransactionContext(Guid.NewGuid(), throwingConn, throwingTx, TransactionIsolationLevel.ReadCommitted, machine, EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance, CancellationToken.None);
         var tx = new PhysicalTransaction(context, machine, throwingConn, throwingTx, ownsConnection: true);
 
         Func<Task> act = async () => await tx.DisposeAsync();

@@ -7,14 +7,14 @@ using EricksonLopez.Transaction.Exceptions;
 namespace EricksonLopez.Transaction.Internal;
 
 /// <summary>
-/// Nested transaction scope adapter backed by a database savepoint on an active physical transaction.
+/// Represents a nested transaction scope adapter backed by a database savepoint on an active physical transaction.
 /// </summary>
 internal sealed class SavepointTransactionScope : ITransaction
 {
     private readonly ITransactionContext _parentContext;
     private readonly ISavepoint _savepoint;
     private readonly TransactionStateMachine _stateMachine;
-    private bool _disposed;
+    private int _disposed;
 
     public SavepointTransactionScope(ITransactionContext parentContext, ISavepoint savepoint)
     {
@@ -36,7 +36,7 @@ internal sealed class SavepointTransactionScope : ITransaction
     /// <inheritdoc/>
     public async Task CommitAsync(CancellationToken cancellationToken = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(_disposed == 1, this);
 
         try
         {
@@ -53,7 +53,7 @@ internal sealed class SavepointTransactionScope : ITransaction
     /// <inheritdoc/>
     public async Task RollbackAsync(CancellationToken cancellationToken = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(_disposed == 1, this);
 
         try
         {
@@ -70,19 +70,17 @@ internal sealed class SavepointTransactionScope : ITransaction
     /// <inheritdoc/>
     public Task<ISavepoint> CreateSavepointAsync(string name, CancellationToken cancellationToken = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(_disposed == 1, this);
         return _parentContext.CreateSavepointAsync(name, cancellationToken);
     }
 
     /// <inheritdoc/>
     public async ValueTask DisposeAsync()
     {
-        if (_disposed)
+        if (Interlocked.Exchange(ref _disposed, 1) == 1)
         {
             return;
         }
-
-        _disposed = true;
 
         if (_stateMachine.CurrentState is TransactionState.Active or TransactionState.Failed)
         {

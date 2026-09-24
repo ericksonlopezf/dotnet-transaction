@@ -38,29 +38,41 @@ internal sealed class TransactionStateMachine
 
     public void TransitionToRolledBack()
     {
-        int current = Volatile.Read(ref _state);
-        if (current == (int)TransactionState.RolledBack || current == (int)TransactionState.Disposed)
+        while (true)
         {
-            return;
-        }
+            int current = Volatile.Read(ref _state);
+            if (current == (int)TransactionState.RolledBack || current == (int)TransactionState.Disposed)
+            {
+                return;
+            }
 
-        if (current != (int)TransactionState.Active && current != (int)TransactionState.Failed && current != (int)TransactionState.Created)
-        {
-            throw new TransactionStateException((TransactionState)current, "Rollback");
-        }
+            if (current != (int)TransactionState.Active && current != (int)TransactionState.Failed && current != (int)TransactionState.Created)
+            {
+                throw new TransactionStateException((TransactionState)current, "Rollback");
+            }
 
-        Interlocked.Exchange(ref _state, (int)TransactionState.RolledBack);
+            if (Interlocked.CompareExchange(ref _state, (int)TransactionState.RolledBack, current) == current)
+            {
+                return;
+            }
+        }
     }
 
     public void TransitionToFailed()
     {
-        int current = Volatile.Read(ref _state);
-        if (current == (int)TransactionState.Failed || current == (int)TransactionState.RolledBack || current == (int)TransactionState.Disposed)
+        while (true)
         {
-            return;
-        }
+            int current = Volatile.Read(ref _state);
+            if (current == (int)TransactionState.Committed || current == (int)TransactionState.Failed || current == (int)TransactionState.RolledBack || current == (int)TransactionState.Disposed)
+            {
+                return;
+            }
 
-        Interlocked.Exchange(ref _state, (int)TransactionState.Failed);
+            if (Interlocked.CompareExchange(ref _state, (int)TransactionState.Failed, current) == current)
+            {
+                return;
+            }
+        }
     }
 
     public void TransitionToDisposed()

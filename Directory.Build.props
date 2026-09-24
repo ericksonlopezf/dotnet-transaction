@@ -1,19 +1,20 @@
 <!-- Copyright © Erickson Lopez. MIT License. -->
 <Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" Condition="Exists($([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../')))" />
 
   <PropertyGroup>
-    <VersionPrefix>1.0.0</VersionPrefix>
+    <VersionPrefix>2.0.0</VersionPrefix>
     <VersionSuffix></VersionSuffix>
 
     <Authors>Erickson Lopez</Authors>
-    <Company>EricksonLopez</Company>
+    <Company>Erickson Lopez</Company>
     <Copyright>Copyright © Erickson Lopez. MIT License.</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://ericksonlopez.dev/transaction</PackageProjectUrl>
     <RepositoryUrl>https://github.com/ericksonlopezf/dotnet-transaction</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <!-- Shared Ecosystem Package Tags -->
-    <CommonPackageTags>dotnet;csharp;native-aot;transactions</CommonPackageTags>
+    <CommonPackageTags>dotnet;.net;csharp;open-source;transaction</CommonPackageTags>
     <PackageTags>$(CommonPackageTags)</PackageTags>
 
     <TargetFrameworks Condition="'$(TargetFramework)' == ''">net8.0;net9.0;net10.0</TargetFrameworks>
@@ -28,6 +29,7 @@
 
     <IsAotCompatible Condition="'$(IsAotCompatible)' == ''">true</IsAotCompatible>
     <EnableTrimAnalyzer Condition="'$(EnableTrimAnalyzer)' == ''">true</EnableTrimAnalyzer>
+    <DisableRuntimeMarshalling>true</DisableRuntimeMarshalling>
 
     <!-- Strong Naming -->
     <SignAssembly Condition="Exists('$(MSBuildThisFileDirectory)EricksonLopez.snk')">true</SignAssembly>
@@ -49,4 +51,7 @@
     <None Include="$(MSBuildThisFileDirectory)icon.png" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
+  </ItemGroup>
 </Project>

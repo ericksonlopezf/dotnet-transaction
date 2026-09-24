@@ -3,15 +3,21 @@
 ## Status
 Accepted
 
+## Date
+2026-09-04
+
 ## Context
 When an application calls `DbTransaction.CommitAsync()`, the database engine writes transaction log records to disk (WAL / redo log) and commits the state. However, if a network partition, TCP connection timeout, or server failover occurs before the acknowledgement (ACK) packet reaches the client application, the client receives an exception (e.g. `SocketException`, `TimeoutException`, `NpgsqlException`).
 
 A critical architectural pitfall is assuming that receiving an exception during `CommitAsync()` implies the transaction was rolled back. In reality, the transaction state is **uncertain (ambiguous)**: the database may have committed the changes successfully.
 
 ## Decision
-1. When `CommitAsync()` encounters an exception, `EricksonLopez.Transaction` captures the failure, marks the transaction state as `Failed`, and throws a specialized `TransactionCommitException` with property `IsAmbiguous = true`.
-2. The framework explicitly documents that applications **MUST NOT** blindly retry non-idempotent operations upon receiving a commit failure.
-3. Resilience to commit ambiguity must be achieved through:
+1. When `CommitAsync()` encounters an exception:
+   - If the exception occurs **after** the `CommitAsync()` call was dispatched to the database engine socket (i.e., after the commit command was sent), `IsAmbiguous = true`. The final database state is **indeterminate** — the commit may or may not have persisted.
+   - If the exception occurs **before** the commit was dispatched (e.g., cancellation, driver validation error, `BeforeCommitAsync` hook failure), `IsAmbiguous = false`. The transaction was never committed and the state is unambiguously rolled back.
+2. In all commit failure cases, `EricksonLopez.Transaction` marks the transaction state as `Failed` and throws a `TransactionCommitException`. The `IsAmbiguous` property provides the caller with precise diagnostic context.
+3. The framework explicitly documents that applications **MUST NOT** blindly retry non-idempotent operations upon receiving a commit failure.
+4. Resilience to commit ambiguity must be achieved through:
    - **Idempotency Keys** (`EricksonLopez.Idempotency`): Ensuring that re-submitted requests can safely recognize already-committed state.
    - **Outbox Pattern** (`EricksonLopez.Outbox`): Ensuring asynchronous side-effects are reconciled by background processors rather than synchronous client retries.
 

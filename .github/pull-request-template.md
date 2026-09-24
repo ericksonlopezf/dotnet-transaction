@@ -7,11 +7,15 @@ Include relevant motivation and context.
 Please check all packages that are affected by this PR:
 - [ ] `EricksonLopez.Transaction` (Core)
 - [ ] `EricksonLopez.Transaction.Abstractions`
+- [ ] `EricksonLopez.Transaction.Analyzers`
 - [ ] `EricksonLopez.Transaction.Dapper`
+- [ ] `EricksonLopez.Transaction.EntityFrameworkCore`
 - [ ] `EricksonLopez.Transaction.MariaDb`
+- [ ] `EricksonLopez.Transaction.Mediator`
 - [ ] `EricksonLopez.Transaction.MySql`
 - [ ] `EricksonLopez.Transaction.Oracle`
 - [ ] `EricksonLopez.Transaction.PostgreSql`
+- [ ] `EricksonLopez.Transaction.Resilience`
 - [ ] `EricksonLopez.Transaction.Result`
 - [ ] `EricksonLopez.Transaction.Sqlite`
 - [ ] `EricksonLopez.Transaction.SqlServer`
@@ -21,10 +25,10 @@ Please check all packages that are affected by this PR:
 
 Before submitting this PR, please verify the following:
 - [ ] I have performed a self-review of my own code.
-- [ ] I have updated the `CHANGELOG.md` (if applicable).
+- [ ] I have updated the `CHANGELOG.md` under `[Unreleased]` (if applicable).
 - [ ] I have added/updated unit tests or integration tests.
 - [ ] Local build passes (`dotnet build EricksonLopez.Transaction.slnx -c Release`).
 - [ ] Local tests pass (`dotnet test EricksonLopez.Transaction.slnx`).
-- [ ] I verified compliance using `./scripts/verify-compliance.ps1`.
+- [ ] I verified compliance using `powershell -ExecutionPolicy Bypass -File .\scripts\verify-compliance.ps1`.
 - [ ] Stryker mutation testing maintains the **95%** mutation score threshold.
-- [ ] Benchmarks confirmed no regressions.
+- [ ] Benchmarks confirmed no regressions (`verify-benchmark-gate.ps1`).

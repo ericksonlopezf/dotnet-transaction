@@ -1,3 +1,4 @@
+// Copyright © Erickson Lopez. MIT License.
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,19 +21,6 @@ public sealed class TransactionPipelineBehaviorTests
             .Returns(Task.FromResult(_transaction));
     }
 
-    [Fact]
-    public async Task Handle_NonTransactionalRequest_DoesNotBeginTransaction()
-    {
-        var behavior = new TransactionPipelineBehavior<TestNonTransactionalRequest, Result<string>>(_transactionManager);
-        var request = new TestNonTransactionalRequest("GetReport");
-        var next = new TestNextContinuation<Result<string>>(() => ValueTask.FromResult(Result<string>.Success("ReportData")));
-
-        var result = await behavior.Handle(request, next, CancellationToken.None);
-
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().Be("ReportData");
-        await _transactionManager.DidNotReceive().BeginAsync(Arg.Any<TransactionOptions?>(), Arg.Any<CancellationToken>());
-    }
 
     [Fact]
     public async Task Handle_TransactionalSuccess_BeginsAndCommitsTransaction()

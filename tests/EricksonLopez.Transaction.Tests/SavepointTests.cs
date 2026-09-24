@@ -129,7 +129,7 @@ public sealed class SavepointTests
     [Fact]
     public void Constructor_WhenTransactionIsNull_ShouldThrowArgumentNullException()
     {
-        Action act = () => _ = new Savepoint(null!, "sp1");
+        Action act = () => _ = new Savepoint(null!, "sp1", EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance);
         act.Should().Throw<ArgumentNullException>();
     }
 
@@ -140,7 +140,7 @@ public sealed class SavepointTests
     public void Constructor_WhenNameIsEmptyOrNull_ShouldThrowArgumentException(string? name)
     {
         var dbTx = Substitute.For<DbTransaction>();
-        Action act = () => _ = new Savepoint(dbTx, name!);
+        Action act = () => _ = new Savepoint(dbTx, name!, EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance);
         act.Should().Throw<ArgumentException>().WithMessage("Savepoint name must not be empty.*");
     }
 
@@ -148,7 +148,7 @@ public sealed class SavepointTests
     public void Constructor_ShouldInitializeProperties()
     {
         var dbTx = Substitute.For<DbTransaction>();
-        var sp = new Savepoint(dbTx, "sp1");
+        var sp = new Savepoint(dbTx, "sp1", EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance);
 
         sp.Name.Should().Be("sp1");
         sp.IsRolledBack.Should().BeFalse();
@@ -168,7 +168,7 @@ public sealed class SavepointTests
         meterListener.Start();
 
         var dbTx = Substitute.For<DbTransaction>();
-        var sp = new Savepoint(dbTx, "sp_test");
+        var sp = new Savepoint(dbTx, "sp_test", EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance);
 
         await sp.RollbackAsync(CancellationToken.None);
 
@@ -191,7 +191,7 @@ public sealed class SavepointTests
 
         var conn = new MockDbConnection();
         var tx = new SavepointThrowingTransaction(conn);
-        var sp = new Savepoint(tx, "sp_fallback");
+        var sp = new Savepoint(tx, "sp_fallback", EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance);
 
         await sp.RollbackAsync(CancellationToken.None);
 
@@ -206,7 +206,7 @@ public sealed class SavepointTests
     public async Task RollbackAsync_WhenConnectionNullAndNotSupported_ShouldCompleteWithoutThrowing()
     {
         var tx = new SavepointThrowingTransaction(null);
-        var sp = new Savepoint(tx, "sp_nullconn");
+        var sp = new Savepoint(tx, "sp_nullconn", EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance);
 
         await sp.RollbackAsync(CancellationToken.None);
 
@@ -226,7 +226,7 @@ public sealed class SavepointTests
         meterListener.Start();
 
         var dbTx = Substitute.For<DbTransaction>();
-        var sp = new Savepoint(dbTx, "sp_test");
+        var sp = new Savepoint(dbTx, "sp_test", EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance);
 
         await sp.ReleaseAsync(CancellationToken.None);
 
@@ -249,7 +249,7 @@ public sealed class SavepointTests
 
         var conn = new MockDbConnection();
         var tx = new SavepointThrowingTransaction(conn);
-        var sp = new Savepoint(tx, "sp_release");
+        var sp = new Savepoint(tx, "sp_release", EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance);
 
         await sp.ReleaseAsync(CancellationToken.None);
 
@@ -264,7 +264,7 @@ public sealed class SavepointTests
     public async Task ReleaseAsync_WhenConnectionNullAndNotSupported_ShouldCompleteWithoutThrowing()
     {
         var tx = new SavepointThrowingTransaction(null);
-        var sp = new Savepoint(tx, "sp_nullconn");
+        var sp = new Savepoint(tx, "sp_nullconn", EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance);
 
         await sp.ReleaseAsync(CancellationToken.None);
 
@@ -276,7 +276,7 @@ public sealed class SavepointTests
     {
         var conn = new ThrowingCommandDbConnection();
         var tx = new SavepointThrowingTransaction(conn);
-        var sp = new Savepoint(tx, "sp_sql_server");
+        var sp = new Savepoint(tx, "sp_sql_server", EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance);
 
         Func<Task> act = () => sp.ReleaseAsync(CancellationToken.None);
 
@@ -288,7 +288,7 @@ public sealed class SavepointTests
     public async Task Operations_AfterDisposal_ShouldThrowObjectDisposedException()
     {
         var dbTx = Substitute.For<DbTransaction>();
-        var sp = new Savepoint(dbTx, "sp_disposed");
+        var sp = new Savepoint(dbTx, "sp_disposed", EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance);
 
         await sp.DisposeAsync();
 
@@ -309,7 +309,7 @@ public sealed class SavepointTests
     public void Constructor_WhenNameEmptyOrWhitespace_ShouldThrowArgumentException(string? name)
     {
         var dbTx = Substitute.For<DbTransaction>();
-        Action act = () => _ = new Savepoint(dbTx, name!);
+        Action act = () => _ = new Savepoint(dbTx, name!, EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance);
 
         act.Should().Throw<ArgumentException>()
             .WithMessage("*must not be empty*");
@@ -324,7 +324,7 @@ public sealed class SavepointTests
     public void Constructor_WhenNameContainsInvalidCharacters_ShouldThrowArgumentException(string name)
     {
         var dbTx = Substitute.For<DbTransaction>();
-        Action act = () => _ = new Savepoint(dbTx, name);
+        Action act = () => _ = new Savepoint(dbTx, name, EricksonLopez.Transaction.Dialects.GenericSqlDialect.Instance);
 
         act.Should().Throw<ArgumentException>()
             .WithMessage("*contains invalid characters*");

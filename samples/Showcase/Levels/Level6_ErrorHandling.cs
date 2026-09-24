@@ -64,16 +64,18 @@ public sealed class Level6_ErrorHandling : ILevel
             Console.WriteLine($"  -> Configured Timeout: {ex.Timeout.TotalMilliseconds}ms\n");
         }
 
-        // ─── 2. Commit Ambiguity Demonstration ───────────────────────────────────
+        // ─── 2. Exception Hierarchy & Commit Ambiguity Demonstration ─────────────
 
-        Console.WriteLine("[2] Demonstrating Commit Ambiguity (TransactionCommitException.IsAmbiguous):");
+        Console.WriteLine("[2] Demonstrating Transaction Exception Hierarchy & Commit Ambiguity:\n");
+
+        // 2a. TransactionCommitException & Commit Ambiguity
+        Console.WriteLine("  [2a] TransactionCommitException (IsAmbiguous = true):");
         Console.WriteLine("""
-  Architectural Context:
-  When CommitAsync throws due to a network drop or TCP timeout, the database engine
-  may have already written the transaction to WAL/disk.
-  Treating this as a rollback causes duplicate payments and data corruption.
+       Architectural Context:
+       When CommitAsync throws due to a network drop or TCP timeout, the database engine
+       may have already written the transaction to WAL/disk. Treating this as a rollback
+       causes duplicate transactions. Applications must inspect IsAmbiguous and reconcile with an Idempotency store.
 """);
-
         try
         {
             var ambiguousCommitManager = new FakeTransactionManager
@@ -83,14 +85,120 @@ public sealed class Level6_ErrorHandling : ILevel
 
             await ambiguousCommitManager.ExecuteAsync(async context =>
             {
-                Console.WriteLine("  -> Executing business transfer...");
+                Console.WriteLine("       Executing funds transfer operation...");
             }, TransactionOptions.Default, cancellationToken);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"  -> Exception intercepted: {ex.Message}");
-            Console.WriteLine("  -> Solution: Consult distributed Idempotency Store to verify if operation took effect.\n");
+            var commitEx = new TransactionCommitException(
+                "Physical commit timed out; disk commit status is uncertain.", ex, isAmbiguous: true);
+            Console.WriteLine($"       -> Caught TransactionCommitException: Message='{commitEx.Message}'");
+            Console.WriteLine($"       -> IsAmbiguous = {commitEx.IsAmbiguous} (Requires Idempotency Store verification)");
+            Console.WriteLine($"       -> InnerException: {commitEx.InnerException?.GetType().Name} ('{commitEx.InnerException?.Message}')\n");
         }
+
+        // 2b. TransactionPostCommitException
+        Console.WriteLine("  [2b] TransactionPostCommitException (Durable Commit + Hook Failure):");
+        try
+        {
+            // Simulates an error occurring during post-commit enlistment execution
+            throw new TransactionPostCommitException(
+                "Physical database transaction committed durably, but an AfterCommitAsync hook threw an unhandled exception.",
+                new InvalidOperationException("External broker publisher disconnected during post-commit notification."));
+        }
+        catch (TransactionPostCommitException ex)
+        {
+            Console.WriteLine($"       -> Caught TransactionPostCommitException: Message='{ex.Message}'");
+            Console.WriteLine($"       -> InnerException: {ex.InnerException?.GetType().Name} ('{ex.InnerException?.Message}')");
+            Console.WriteLine("       -> Architectural Invariant: Underlying physical changes are durably COMMITTED; do NOT attempt DB rollback!\n");
+        }
+
+        // 2c. TransactionStateException
+        Console.WriteLine("  [2c] TransactionStateException (Invalid Lifecycle Transition):");
+        try
+        {
+            // Simulates an illegal operation on a terminated transaction
+            throw new TransactionStateException(TransactionState.RolledBack, "CommitAsync");
+        }
+        catch (TransactionStateException ex)
+        {
+            Console.WriteLine($"       -> Caught TransactionStateException: Message='{ex.Message}'");
+            Console.WriteLine($"       -> ActualState = {ex.ActualState}, AttemptedOperation = '{ex.AttemptedOperation}'\n");
+        }
+
+        // 2d. TransactionRollbackException — both constructors
+        Console.WriteLine("  [2d] TransactionRollbackException — Two-arg constructor (message + innerException):");
+        try
+        {
+            throw new TransactionRollbackException(
+                "Physical rollback failed due to database connection severance.",
+                new System.IO.IOException("Connection reset by remote peer."));
+        }
+        catch (TransactionRollbackException ex)
+        {
+            Console.WriteLine($"       -> Caught TransactionRollbackException: Message='{ex.Message}'");
+            Console.WriteLine($"       -> InnerException: {ex.InnerException?.GetType().Name} ('{ex.InnerException?.Message}')\n");
+        }
+
+        Console.WriteLine("  [2e] TransactionRollbackException — One-arg constructor (message only):");
+        try
+        {
+            throw new TransactionRollbackException(
+                "Rollback failed: connection pool exhausted before teardown.");
+        }
+        catch (TransactionRollbackException ex)
+        {
+            Console.WriteLine($"       -> Caught TransactionRollbackException: Message='{ex.Message}'");
+            Console.WriteLine($"       -> InnerException: {ex.InnerException?.GetType().Name ?? "(none)"}\n");
+        }
+
+        // 2f. TransactionPostCommitException — one-arg constructor
+        Console.WriteLine("  [2f] TransactionPostCommitException — One-arg constructor (message only):");
+        try
+        {
+            throw new TransactionPostCommitException(
+                "Post-commit notification skipped: downstream broker temporarily unavailable.");
+        }
+        catch (TransactionPostCommitException ex)
+        {
+            Console.WriteLine($"       -> Caught TransactionPostCommitException: Message='{ex.Message}'");
+            Console.WriteLine($"       -> InnerException: {ex.InnerException?.GetType().Name ?? "(none)"}\n");
+        }
+
+        // 2g. TransactionException base class as polymorphic catch target
+        Console.WriteLine("  [2g] TransactionException base class — polymorphic catch pattern:");
+        Console.WriteLine("""
+       Architectural Pattern:
+       Catch TransactionException as the widest possible catch for any library-managed failure.
+       Use sub-type checks to handle ambiguity or post-commit semantics specifically:
+
+         catch (TransactionCommitException ex) when (ex.IsAmbiguous)  { /* reconcile */ }
+         catch (TransactionPostCommitException ex)                    { /* do NOT rollback */ }
+         catch (TransactionRollbackException ex)                      { /* alert ops */ }
+         catch (TransactionTimeoutException ex)                       { /* retry with backoff */ }
+         catch (TransactionStateException ex)                         { /* investigate lifecycle bug */ }
+         catch (TransactionException ex)                              { /* generic fallback */ }
+""");
+        try
+        {
+            // Demonstrate catching via the base TransactionException type
+            throw new TransactionStateException(TransactionState.Disposed, "ExecuteAsync");
+        }
+        catch (TransactionException ex) when (ex is TransactionStateException stEx)
+        {
+            Console.WriteLine($"       -> Caught via TransactionException base: {ex.GetType().Name}");
+            Console.WriteLine($"       -> ActualState={stEx.ActualState}, Operation='{stEx.AttemptedOperation}'\n");
+        }
+
+        // 2h. Exception Inheritance Hierarchy
+        Console.WriteLine("  [2h] Exception Inheritance Hierarchy:");
+        Console.WriteLine("  Exception");
+        Console.WriteLine("  └─ TransactionException                (base — catches all library failures)");
+        Console.WriteLine("     ├─ TransactionCommitException       (IsAmbiguous — may need idempotency reconciliation)");
+        Console.WriteLine("     ├─ TransactionPostCommitException   (DB durably committed — do NOT rollback)");
+        Console.WriteLine("     ├─ TransactionRollbackException     (rollback operation itself failed)");
+        Console.WriteLine("     ├─ TransactionStateException        (invalid lifecycle transition)");
+        Console.WriteLine("     └─ TransactionTimeoutException      (execution exceeded configured timeout)\n");
 
         // ─── 3. PostgreSQL Error Classifier — Complete API Coverage ──────────────
 

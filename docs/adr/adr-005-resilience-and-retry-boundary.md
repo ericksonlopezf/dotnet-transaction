@@ -3,6 +3,9 @@
 ## Status
 Accepted
 
+## Date
+2026-09-04
+
 ## Context
 When executing database operations in high-concurrency environments, transient failures can occur:
 - PostgreSQL Serialization Conflict (`SQLSTATE 40001` under `Serializable` or `RepeatableRead`).

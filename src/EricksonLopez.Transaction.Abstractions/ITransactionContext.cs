@@ -24,6 +24,11 @@ public interface ITransactionContext : IAsyncDisposable
     /// <summary>
     /// Gets the underlying active database connection associated with this transaction.
     /// </summary>
+    /// <remarks>
+    /// Do not manually invoke <c>Dispose()</c>, <see cref="System.Data.Common.DbConnection.Close()"/>, 
+    /// or <see cref="System.Data.Common.DbConnection.BeginTransaction()"/> on this instance. 
+    /// Mutating the connection state manually circumvents the state machine and corrupts the transaction boundary.
+    /// </remarks>
     DbConnection Connection { get; }
 
     /// <summary>
@@ -47,7 +52,7 @@ public interface ITransactionContext : IAsyncDisposable
     CancellationToken CancellationToken { get; }
 
     /// <summary>
-    /// Gets the list of enlistments attached to this transaction lifecycle.
+    /// Gets the read-only collection of enlistments attached to this transaction lifecycle.
     /// </summary>
     IReadOnlyList<ITransactionEnlistment> Enlistments { get; }
 
@@ -64,4 +69,15 @@ public interface ITransactionContext : IAsyncDisposable
     /// </summary>
     /// <param name="enlistment">The enlistment participant to register.</param>
     void Enlist(ITransactionEnlistment enlistment);
+
+    /// <summary>
+    /// Gets a value indicating whether this transaction context has been marked rollback-only.
+    /// </summary>
+    bool IsRollbackOnly { get; }
+
+    /// <summary>
+    /// Marks this transaction context as rollback-only, preventing subsequent commits.
+    /// </summary>
+    /// <param name="reason">The diagnostic reason for marking the transaction rollback-only.</param>
+    void SetRollbackOnly(string reason);
 }

@@ -1,43 +1,54 @@
 // Copyright © Erickson Lopez. MIT License.
 using System;
 using System.Data.Common;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Diagnostics.CodeAnalysis;
 using EricksonLopez.Transaction.Diagnostics;
 
 namespace EricksonLopez.Transaction.Internal;
 
 /// <summary>
-/// Implements <see cref="ISavepoint"/> over an underlying ADO.NET <see cref="DbTransaction"/>.
+/// Represents an implementation of <see cref="ISavepoint"/> over an underlying ADO.NET <see cref="DbTransaction"/>.
 /// </summary>
 internal sealed class Savepoint : ISavepoint
 {
     private readonly DbTransaction _transaction;
-    private bool _disposed;
+    private readonly IDatabaseDialect _dialect;
+    private int _disposed;
 
-    public Savepoint(DbTransaction transaction, string name)
+    public Savepoint(DbTransaction transaction, string name, IDatabaseDialect dialect)
     {
         _transaction = transaction ?? throw new ArgumentNullException(nameof(transaction));
+        _dialect = dialect ?? throw new ArgumentNullException(nameof(dialect));
         Name = ValidateName(name);
     }
 
     internal static string ValidateName(string name)
     {
-        if (string.IsNullOrWhiteSpace(name))
+        ValidateName(name.AsSpan());
+        return name;
+    }
+
+    internal static void ValidateName(ReadOnlySpan<char> name)
+    {
+        if (name.IsWhiteSpace())
         {
             throw new ArgumentException("Savepoint name must not be empty.", nameof(name));
         }
 
-        foreach (char c in name)
+        if (name.Length > 128)
         {
-            if (!char.IsLetterOrDigit(c) && c != '_')
-            {
-                throw new ArgumentException($"Savepoint name '{name}' contains invalid characters. Only alphanumeric characters and underscores are allowed.", nameof(name));
-            }
+            throw new ArgumentException("Savepoint name must not exceed 128 characters.", nameof(name));
         }
 
-        return name;
+        foreach (char c in name)
+        {
+            if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_'))
+            {
+                throw new ArgumentException($"Savepoint name '{name.ToString()}' contains invalid characters. Only alphanumeric ASCII characters and underscores are allowed.", nameof(name));
+            }
+        }
     }
 
     /// <inheritdoc/>
@@ -58,7 +69,7 @@ internal sealed class Savepoint : ISavepoint
     [SuppressMessage("Security", "CA2100:Review SQL queries for security vulnerabilities", Justification = "Savepoint name is validated as a strict alphanumeric identifier.")]
     public async Task RollbackAsync(CancellationToken cancellationToken = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(_disposed == 1, this);
 
         try
         {
@@ -71,9 +82,11 @@ internal sealed class Savepoint : ISavepoint
             // Fallback for providers that don't override DbTransaction.RollbackAsync(savepointName)
             if (_transaction.Connection is not null)
             {
+                string rollbackSql = _dialect.GetSavepointRollbackSql(Name);
+
                 await using DbCommand cmd = _transaction.Connection.CreateCommand();
                 cmd.Transaction = _transaction;
-                cmd.CommandText = $"ROLLBACK TO SAVEPOINT {Name};";
+                cmd.CommandText = rollbackSql;
                 await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
                 IsRolledBack = true;
                 TransactionDiagnostics.RecordSavepointRolledBack();
@@ -86,7 +99,7 @@ internal sealed class Savepoint : ISavepoint
     [SuppressMessage("Security", "CA2100:Review SQL queries for security vulnerabilities", Justification = "Savepoint name is validated as a strict alphanumeric identifier.")]
     public async Task ReleaseAsync(CancellationToken cancellationToken = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(_disposed == 1, this);
 
         try
         {
@@ -96,21 +109,25 @@ internal sealed class Savepoint : ISavepoint
         }
         catch (NotSupportedException)
         {
-            // Fallback for providers that support RELEASE SAVEPOINT via SQL (e.g. PostgreSQL, SQLite)
+            // Fallback for providers that support RELEASE SAVEPOINT via SQL
             if (_transaction.Connection is not null)
             {
-                try
+                string? releaseSql = _dialect.GetSavepointReleaseSql(Name);
+                if (releaseSql != null)
                 {
-                    await using DbCommand cmd = _transaction.Connection.CreateCommand();
-                    cmd.Transaction = _transaction;
-                    cmd.CommandText = $"RELEASE SAVEPOINT {Name};";
-                    await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-                    IsReleased = true;
-                    TransactionDiagnostics.RecordSavepointReleased();
-                }
-                catch
-                {
-                    // If release savepoint is not supported by database engine (e.g. SQL Server), ignore silently
+                    try
+                    {
+                        await using DbCommand cmd = _transaction.Connection.CreateCommand();
+                        cmd.Transaction = _transaction;
+                        cmd.CommandText = releaseSql;
+                        await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+                        IsReleased = true;
+                        TransactionDiagnostics.RecordSavepointReleased();
+                    }
+                    catch
+                    {
+                        // If release savepoint fails on fallback, ignore silently
+                    }
                 }
             }
         }
@@ -119,7 +136,10 @@ internal sealed class Savepoint : ISavepoint
     /// <inheritdoc/>
     public ValueTask DisposeAsync()
     {
-        _disposed = true;
+        if (Interlocked.Exchange(ref _disposed, 1) == 1)
+        {
+            return ValueTask.CompletedTask;
+        }
         return ValueTask.CompletedTask;
     }
 }

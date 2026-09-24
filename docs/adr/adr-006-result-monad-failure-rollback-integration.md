@@ -3,6 +3,9 @@
 ## Status
 Accepted
 
+## Date
+2026-09-04
+
 ## Context
 The organizational ecosystem adopts the Result Pattern (`EricksonLopez.Result`) for functional domain error handling. Domain validation errors and expected business failures return failure result objects (`Result.Failure(error)`) instead of throwing runtime exceptions.
 

@@ -3,6 +3,9 @@
 ## Status
 Accepted
 
+## Date
+2026-09-04
+
 ## Context
 Participants that enlist in transaction boundaries (such as Outbox dispatchers, audit logging adapters, idempotency stores, or external notification handlers) frequently need to clean up uncommitted buffers, notify observability pipelines, or record diagnostic telemetry when an unexpected failure occurs during transaction execution or commit.
 

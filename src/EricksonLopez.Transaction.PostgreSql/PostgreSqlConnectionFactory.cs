@@ -10,9 +10,10 @@ namespace EricksonLopez.Transaction.PostgreSql;
 /// <summary>
 /// Provides an <see cref="IDbConnectionFactory"/> implementation for PostgreSQL databases using <see cref="NpgsqlDataSource"/>.
 /// </summary>
-public sealed class PostgreSqlConnectionFactory : IDbConnectionFactory
+public sealed class PostgreSqlConnectionFactory : IDbConnectionFactory, IAsyncDisposable, IDisposable
 {
     private readonly NpgsqlDataSource _dataSource;
+    private readonly bool _ownsDataSource;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PostgreSqlConnectionFactory"/> class with an <see cref="NpgsqlDataSource"/>.
@@ -22,6 +23,7 @@ public sealed class PostgreSqlConnectionFactory : IDbConnectionFactory
     public PostgreSqlConnectionFactory(NpgsqlDataSource dataSource)
     {
         _dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
+        _ownsDataSource = false;
     }
 
     /// <summary>
@@ -33,6 +35,7 @@ public sealed class PostgreSqlConnectionFactory : IDbConnectionFactory
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
         _dataSource = NpgsqlDataSource.Create(connectionString);
+        _ownsDataSource = true;
     }
 
     /// <inheritdoc/>
@@ -44,6 +47,24 @@ public sealed class PostgreSqlConnectionFactory : IDbConnectionFactory
     /// <inheritdoc/>
     public DbConnection CreateConnection()
     {
-        return _dataSource.OpenConnection();
+        return _dataSource.CreateConnection();
+    }
+
+    /// <inheritdoc/>
+    public async ValueTask DisposeAsync()
+    {
+        if (_ownsDataSource)
+        {
+            await _dataSource.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        if (_ownsDataSource)
+        {
+            _dataSource.Dispose();
+        }
     }
 }

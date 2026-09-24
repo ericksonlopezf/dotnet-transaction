@@ -32,7 +32,7 @@ This document provides a comprehensive technical reference detailing transaction
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Active : BeginTransactionAsync
+    [*] --> Active : BeginAsync
     Active --> Committed : CommitAsync
     Active --> RolledBack : RollbackAsync
     Active --> Disposed : DisposeAsync (Auto-rollback if Active)
@@ -42,9 +42,11 @@ stateDiagram-v2
 
 | State (`TransactionState`) | Transitions Allowed | Auto-Rollback on Dispose | Can Execute Queries |
 | :--- | :--- | :---: | :---: |
-| **`Active`** | `Committed`, `RolledBack`, `Disposed` | Yes (Safe Rollback) | Yes |
+| **`Created`** | `Active` | No | No (Connection not yet open) |
+| **`Active`** | `Committed`, `RolledBack`, `Failed`, `Disposed` | Yes (Safe Rollback) | Yes |
 | **`Committed`** | `Disposed` | No | No (Connection finalized) |
 | **`RolledBack`** | `Disposed` | No | No (Connection finalized) |
+| **`Failed`** | `Disposed` | No | No (Ambiguous / Driver Error) |
 | **`Disposed`** | Final state | No | No |
 
 ---
@@ -54,6 +56,10 @@ stateDiagram-v2
 | Integration | Package | Key Mechanism | Performance Characteristics |
 | :--- | :--- | :--- | :--- |
 | **Dapper** | `EricksonLopez.Transaction.Dapper` | `TransactionDapperExtensions` | Zero-allocation pass-through of `DbConnection` and `DbTransaction` |
-| **EricksonLopez.Result** | `EricksonLopez.Transaction.Result` | `TransactionResultExtensions` | Automatic rollback when delegate returns `Result.Failure` |
-| **Testing** | `EricksonLopez.Transaction.Testing` | `FakeTransactionManager`, `FakeTransactionContext` | Pure in-memory unit testing without database instances |
-| **OpenTelemetry** | `EricksonLopez.Transaction` (Core) | `TransactionDiagnostics` | Spans for `Transaction.Execute`, metrics for commit/rollback durations |
+| **EricksonLopez.Result** | `EricksonLopez.Transaction.Result` | `TransactionResultExtensions` | Automatic rollback when delegate returns `Result.Failure` without exception overhead |
+| **EricksonLopez.Mediator** | `EricksonLopez.Transaction.Mediator` | `TransactionPipelineBehavior` | Declarative `[Transactional]` and AOT-safe `ITransactionalCommandOptions` command pipeline wrapper |
+| **Entity Framework Core** | `EricksonLopez.Transaction.EntityFrameworkCore` | `DbContextTransactionExtensions` | Enlists EF Core `DbContext` in active `ITransactionContext` via `UseTransactionAsync` |
+| **Polly Resilience** | `EricksonLopez.Transaction.Resilience` | `PollyTransactionExtensions` | Extends Polly `PolicyBuilder` with `HandleAmbiguousCommit()` for idempotent retry policies |
+| **Roslyn Static Analysis** | `EricksonLopez.Transaction.Analyzers` | `ConnectionManipulationAnalyzer` | Compile-time diagnostic `ELT001` preventing manual disposal or mutation of `context.Connection` |
+| **Testing Doubles** | `EricksonLopez.Transaction.Testing` | `FakeTransactionManager`, `FakeTransactionContext` | Pure in-memory unit testing and failure simulation without database instances |
+| **OpenTelemetry** | `EricksonLopez.Transaction` (Core) | `TransactionDiagnostics` | Spans for `Transaction.Execute`, metrics for commit/rollback durations and savepoint lifecycle |

@@ -12,7 +12,7 @@ High-performance, explicit, composable, and Native AOT-ready relational database
 [![.NET](https://img.shields.io/badge/.NET_8_%7C_9_%7C_10-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com)
 [![NativeAOT](https://img.shields.io/badge/NativeAOT-Compatible-brightgreen?style=for-the-badge)](https://learn.microsoft.com/en-us/dotnet/core/deploying/native-aot)
 
-`EricksonLopez.Transaction` is an enterprise-grade, lightweight, async-first relational database transaction coordinator engineered for modern **.NET 8**, **.NET 9**, and **.NET 10** applications. It eliminates scattered connection lifecycles, leaky transaction boundaries, silent commits on functional failure, and broken nested transaction states by providing an explicit, composable, and observable execution layer built directly upon ADO.NET primitives. Designed with a strict zero-reflection, low-allocation footprint and 100% Native AOT compliance, it seamlessly bridges Clean Architecture repositories, Dapper micro-ORMs, functional `Result<T>` patterns, database savepoints, and OpenTelemetry observability across 6 relational database engines (PostgreSQL, SQL Server, MySQL, MariaDB, Oracle, and SQLite).
+`EricksonLopez.Transaction` is an enterprise-grade, lightweight, async-first relational database transaction coordinator engineered for modern **.NET 8**, **.NET 9**, and **.NET 10** applications. It eliminates scattered connection lifecycles, leaky transaction boundaries, silent commits on functional failure, and broken nested transaction states by providing an explicit, composable, and observable execution layer built directly upon ADO.NET primitives. Designed with a strict zero-reflection, low-allocation footprint and 100% Native AOT compliance, it seamlessly bridges Clean Architecture repositories, Dapper micro-ORMs, Entity Framework Core, functional `Result<T>` patterns, database savepoints, and OpenTelemetry observability across 6 relational database engines (PostgreSQL, SQL Server, MySQL, MariaDB, Oracle, and SQLite).
 
 ---
 
@@ -31,9 +31,13 @@ High-performance, explicit, composable, and Native AOT-ready relational database
   - [Dependency Injection Registration](#dependency-injection-registration)
   - [Transaction Options Configuration](#transaction-options-configuration)
   - [Dapper Command Binding (`EricksonLopez.Transaction.Dapper`)](#dapper-command-binding-ericksonlopeztransactiondapper)
+  - [Entity Framework Core Enlistment (`EricksonLopez.Transaction.EntityFrameworkCore`)](#entity-framework-core-enlistment-ericksonlopeztransactionentityframeworkcore)
+  - [Mediator Pipeline Behavior (`EricksonLopez.Transaction.Mediator`)](#mediator-pipeline-behavior-ericksonlopeztransactionmediator)
+  - [Polly Resilience & Ambiguous Commit Policy (`EricksonLopez.Transaction.Resilience`)](#polly-resilience--ambiguous-commit-policy-ericksonlopeztransactionresilience)
   - [OpenTelemetry Distributed Tracing & Metrics](#opentelemetry-distributed-tracing--metrics)
   - [Zero-Allocation Structured Logging](#zero-allocation-structured-logging)
   - [Multi-Dialect Concurrency Error Classifiers](#multi-dialect-concurrency-error-classifiers)
+  - [Roslyn Diagnostic Analyzers (`EricksonLopez.Transaction.Analyzers`)](#roslyn-diagnostic-analyzers-ericksonlopeztransactionanalyzers)
 - [Testing & Quality](#-testing--quality)
   - [In-Memory Test Doubles (`EricksonLopez.Transaction.Testing`)](#in-memory-test-doubles-ericksonlopeztransactiontesting)
   - [Quality Gates & Mutation Testing](#quality-gates--mutation-testing)
@@ -41,7 +45,7 @@ High-performance, explicit, composable, and Native AOT-ready relational database
 - [Compatibility & Technical Matrix](#-compatibility--technical-matrix)
   - [Runtime & Native AOT Compatibility](#runtime--native-aot-compatibility)
   - [Database Engine & Savepoint Capability Matrix](#database-engine--savepoint-capability-matrix)
-  - [Concurrency Error Diagnostics Mapping](#concurrency-error-diagnostics-mapping)
+  - [Concurrency Error Diagnostics & HTTP Status Mapping](#concurrency-error-diagnostics--http-status-mapping)
 - [Architecture & Design Principles](#-architecture--design-principles)
   - [Package Tiering & Dependency Inversion](#package-tiering--dependency-inversion)
   - [Transaction Lifecycle State Machine](#transaction-lifecycle-state-machine)
@@ -94,7 +98,7 @@ Managing relational database transactions across enterprise Clean Architecture a
 
 ## ⚡ Key Features
 
-- 🚀 **Zero-Allocation Hot Path**: Uses optimized structs, static factory methods, and `ValueTask` factory bindings to minimize garbage collection pressure in high-throughput database workloads.
+- 🚀 **Low-Allocation Hot Path**: Uses `TransactionOptions.Default` as a shared singleton (zero-allocation for the common case), `ValueTask` on async paths, and `[LoggerMessage]` source-generated logging to minimize GC pressure in high-throughput database workloads. Framework overhead over raw ADO.NET is approximately 3% (measured at +80 bytes per transaction boundary in benchmarks).
 - ⚡ **100% Native AOT & Trimming Compliant**: Zero unconstrained reflection and zero dynamic IL generation, validated via dedicated self-contained Native AOT smoke testing suites.
 - 🔄 **Ambient AsyncLocal Context Flow**: Contextually flows active `DbConnection` and `DbTransaction` handles across asynchronous call stacks with automatic scope cleanup upon completion.
 - 🛡️ **4 Deterministic Nested Behaviors**: Complete control over nested scopes with `UseSavepoint` (hierarchical recovery), `JoinExisting` (atomic participation), `RequireNew` (isolated connection), and `Suppress` (non-transactional execution).
@@ -124,6 +128,10 @@ The `EricksonLopez.Transaction` ecosystem is modularized into strictly segregate
 | [`EricksonLopez.Transaction.Sqlite`](https://www.nuget.org/packages/EricksonLopez.Transaction.Sqlite) | [![NuGet](https://img.shields.io/nuget/v/EricksonLopez.Transaction.Sqlite?style=flat-square)](https://www.nuget.org/packages/EricksonLopez.Transaction.Sqlite) | SQLite provider factory (`Microsoft.Data.Sqlite`) and WAL mode concurrency error classifier. | `Abstractions`, `EricksonLopez.Transaction`, `Microsoft.Data.Sqlite`, `Microsoft.Extensions.DependencyInjection.Abstractions` |
 | [`EricksonLopez.Transaction.Result`](https://www.nuget.org/packages/EricksonLopez.Transaction.Result) | [![NuGet](https://img.shields.io/nuget/v/EricksonLopez.Transaction.Result?style=flat-square)](https://www.nuget.org/packages/EricksonLopez.Transaction.Result) | Functional `Result<T>` monad integration with automatic failure rollback. | `Abstractions`, `EricksonLopez.Result` |
 | [`EricksonLopez.Transaction.Testing`](https://www.nuget.org/packages/EricksonLopez.Transaction.Testing) | [![NuGet](https://img.shields.io/nuget/v/EricksonLopez.Transaction.Testing?style=flat-square)](https://www.nuget.org/packages/EricksonLopez.Transaction.Testing) | In-memory test doubles (`FakeTransactionManager`, `FakeTransactionContext`) for unit test isolation. | `Abstractions` |
+| [`EricksonLopez.Transaction.Mediator`](https://www.nuget.org/packages/EricksonLopez.Transaction.Mediator) | [![NuGet](https://img.shields.io/nuget/v/EricksonLopez.Transaction.Mediator?style=flat-square)](https://www.nuget.org/packages/EricksonLopez.Transaction.Mediator) | Mediator pipeline behavior for declarative `[Transactional]` command boundaries. | `Abstractions`, `Result`, `EricksonLopez.Mediator`, `EricksonLopez.Result` |
+| [`EricksonLopez.Transaction.EntityFrameworkCore`](https://www.nuget.org/packages/EricksonLopez.Transaction.EntityFrameworkCore) | [![NuGet](https://img.shields.io/nuget/v/EricksonLopez.Transaction.EntityFrameworkCore?style=flat-square)](https://www.nuget.org/packages/EricksonLopez.Transaction.EntityFrameworkCore) | EF Core `DbContext` transaction enlistment and execution bridge. | `Abstractions`, `Microsoft.EntityFrameworkCore.Relational` |
+| [`EricksonLopez.Transaction.Resilience`](https://www.nuget.org/packages/EricksonLopez.Transaction.Resilience) | [![NuGet](https://img.shields.io/nuget/v/EricksonLopez.Transaction.Resilience?style=flat-square)](https://www.nuget.org/packages/EricksonLopez.Transaction.Resilience) | Polly retry policy extensions with transaction commit ambiguity awareness. | `Abstractions`, `Polly` |
+| [`EricksonLopez.Transaction.Analyzers`](https://www.nuget.org/packages/EricksonLopez.Transaction.Analyzers) | [![NuGet](https://img.shields.io/nuget/v/EricksonLopez.Transaction.Analyzers?style=flat-square)](https://www.nuget.org/packages/EricksonLopez.Transaction.Analyzers) | Roslyn diagnostic analyzers enforcing transactional safety rules at compile-time (`ELT001`). | *Roslyn Analyzer* |
 
 ---
 
@@ -151,14 +159,25 @@ The repository includes an executable reference console application located at [
 
 ### 📖 Technical Reference & Architecture Guides
 
-- [**Architecture & Invariants Specification**](https://github.com/ericksonlopezf/dotnet-transaction/blob/main/docs/architecture.md) — Architectural blueprints, memory model, state machine, and layer boundaries.
-- [**Architectural Decision Records (ADRs)**](https://github.com/ericksonlopezf/dotnet-transaction/tree/main/docs/adr) — Comprehensive catalog of 26 ADRs documenting design rationale and systematic rejections.
-- [**Public API Reference**](https://github.com/ericksonlopezf/dotnet-transaction/blob/main/docs/public-api.md) — Authoritative XML-derived public contract specifications across all 11 packages.
+- [**Quick Start (5-Minute Guide)**](https://github.com/ericksonlopezf/dotnet-transaction/blob/main/docs/quick-start.md) — Fast onboarding from NuGet package installation to your first atomic transaction.
+- [**Getting Started Guide**](https://github.com/ericksonlopezf/dotnet-transaction/blob/main/docs/getting-started.md) — Step-by-step developer guide for dependency injection, ambient context flow, and ecosystem integrations.
+- [**Architecture & Invariants Specification**](https://github.com/ericksonlopezf/dotnet-transaction/blob/main/docs/architecture.md) — Architectural blueprints, memory model, state machine, layer boundaries, and Mermaid diagrams.
+- [**Public API Reference**](https://github.com/ericksonlopezf/dotnet-transaction/blob/main/docs/public-api.md) — Authoritative Microsoft Learn-style public contract specifications across all 15 packages.
+- [**API Inventory Catalog**](https://github.com/ericksonlopezf/dotnet-transaction/blob/main/docs/api-inventory.md) — Comprehensive 52-type public API inventory and classification matrix.
+- [**Enterprise Integration Cookbook**](https://github.com/ericksonlopezf/dotnet-transaction/blob/main/docs/cookbook.md) — 10 complete, compilable recipes (Transactional Outbox, Sagas, Idempotency, Savepoints).
+- [**Best Practices & Anti-Patterns**](https://github.com/ericksonlopezf/dotnet-transaction/blob/main/docs/best-practices.md) — Staff Engineer architectural invariants, resilience placement, and anti-pattern rejections.
+- [**Performance & Benchmarking Guide**](https://github.com/ericksonlopezf/dotnet-transaction/blob/main/docs/performance-guide.md) — Zero-allocation hot paths, BenchmarkDotNet metrics, and connection pooling tuning.
+- [**Troubleshooting & Diagnostics**](https://github.com/ericksonlopezf/dotnet-transaction/blob/main/docs/troubleshooting.md) — Root-cause analyses for deadlocks, SQLSTATE 25P02, commit ambiguity, and Roslyn warnings.
+- [**Migration Guide**](https://github.com/ericksonlopezf/dotnet-transaction/blob/main/docs/migration-guide.md) — Step-by-step migration from `TransactionScope`, raw ADO.NET, and `DbContext.Database.BeginTransaction()`.
+- [**Frequently Asked Questions (FAQ)**](https://github.com/ericksonlopezf/dotnet-transaction/blob/main/docs/faq.md) — Detailed answers to runtime, ambient context, and Native AOT questions.
+- [**Architectural Decision Records (ADRs)**](https://github.com/ericksonlopezf/dotnet-transaction/tree/main/docs/adr) — Comprehensive catalog of 33 ADRs documenting design rationale and systematic rejections.
 - [**Native AOT & Trimming Guide**](https://github.com/ericksonlopezf/dotnet-transaction/blob/main/docs/aot.md) — Zero-reflection invariants, IL trimming guarantees, and AOT smoke test verification.
 - [**Build, Quality & CI/CD Specification**](https://github.com/ericksonlopezf/dotnet-transaction/blob/main/docs/ci-cd-quality.md) — Central Package Management, GitHub Actions pipelines, and quality gates.
 - [**Package Catalog & Dependency Topology**](https://github.com/ericksonlopezf/dotnet-transaction/blob/main/docs/packages.md) — Package metadata, assembly references, and target framework mapping.
-- [**Showcase Technical Specification & API Audit**](https://github.com/ericksonlopezf/dotnet-transaction/blob/main/docs/showcase-specification.md) — Functional system architecture map and public API inventory.
-- [**Functional Parity & Competitive Audit**](https://github.com/ericksonlopezf/dotnet-transaction/blob/main/functional-parity-audit.md) — Evidence-based technical audit against `Dapper.Transaction` and `TransactionScope`.
+- [**Master Features Matrix**](https://github.com/ericksonlopezf/dotnet-transaction/blob/main/docs/master-feature-matrix.md) — Comprehensive technical capabilities across database dialects and integration packages.
+- [**Testing Roadmap & Verification**](https://github.com/ericksonlopezf/dotnet-transaction/blob/main/docs/testing-roadmap.md) — Test pyramid, unit/integration suites, Native AOT smoke testing, and mutation score targets.
+- [**Showcase Technical Specification & API Audit**](https://github.com/ericksonlopezf/dotnet-transaction/blob/main/docs/showcase-specification.md) — Functional system architecture map, 11-level syllabus, and public API audit.
+- [**Changelog & Release Engineering**](https://github.com/ericksonlopezf/dotnet-transaction/blob/main/docs/changelog-example.md) — Semantic versioning policy, release taxonomy, and version changelog.
 
 ---
 
@@ -200,8 +219,20 @@ dotnet add package EricksonLopez.Transaction.Sqlite
 # High-performance Dapper command bindings
 dotnet add package EricksonLopez.Transaction.Dapper
 
+# Mediator pipeline behavior (TransactionPipelineBehavior)
+dotnet add package EricksonLopez.Transaction.Mediator
+
+# Native Entity Framework Core integration
+dotnet add package EricksonLopez.Transaction.EntityFrameworkCore
+
 # Functional Result<T> monad auto-rollback integration
 dotnet add package EricksonLopez.Transaction.Result
+
+# Polly resilience and ambiguous commit retry integration
+dotnet add package EricksonLopez.Transaction.Resilience
+
+# Roslyn compile-time analyzers enforcing transactional safety
+dotnet add package EricksonLopez.Transaction.Analyzers
 ```
 
 ### 4. Unit Testing & Test Doubles
@@ -230,6 +261,9 @@ builder.Services.AddPostgreSqlTransaction(
 
 // Alternatively, register using an existing NpgsqlDataSource singleton:
 // builder.Services.AddPostgreSqlTransaction(dataSourceInstance);
+
+// Optional: Register the Mediator pipeline behavior (EricksonLopez.Transaction.Mediator)
+builder.Services.AddTransactionPipelineBehavior();
 ```
 
 ### 2. Automatic Transaction Execution in Application Services
@@ -502,11 +536,16 @@ public sealed class AdjustInventoryHandler(ITransactionManager transactionManage
 Execute an independent non-transactional audit or metrics recording operation without enrolling in the ambient transaction scope:
 
 ```csharp
-public sealed class SecurityAuditService(ITransactionManager transactionManager)
+// IDbConnectionFactory is injected separately for the suppressed (non-ambient) connection
+public sealed class SecurityAuditService(
+    ITransactionManager transactionManager,
+    IDbConnectionFactory connectionFactory)
 {
     public async Task RecordLoginAttemptAsync(string username, bool successful, CancellationToken ct)
     {
-        // Suppresses any outer ambient transaction; executes on a separate non-transactional connection
+        // Suppresses any outer ambient transaction; executes on a separate non-transactional connection.
+        // Note: the parameterless ExecuteAsync overload must be used with Suppress — the
+        // context-receiving overload throws InvalidOperationException in a Suppress scope.
         var suppressOptions = TransactionOptions.Default with
         {
             NestedBehavior = NestedTransactionBehavior.Suppress
@@ -514,7 +553,8 @@ public sealed class SecurityAuditService(ITransactionManager transactionManager)
 
         await transactionManager.ExecuteAsync(async () =>
         {
-            await using var conn = new NpgsqlConnection("...");
+            // Suppress hides the outer ITransactionContext. Acquire a direct connection via the factory.
+            await using var conn = await connectionFactory.CreateConnectionAsync(ct);
             await conn.OpenAsync(ct);
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = "INSERT INTO security_logs (username, success, timestamp) VALUES (@u, @s, NOW())";
@@ -556,12 +596,15 @@ builder.Services.AddSqliteTransaction(connectionString);
 
 ```csharp
 // Static Presets
+// Default is a shared singleton — zero-allocation on repeated access
 var defaultOptions    = TransactionOptions.Default;       // ReadCommitted, UseSavepoint
+// Serializable and ReadOnlyMode are properties that create a new instance on each call
 var serializableOpt   = TransactionOptions.Serializable;  // Serializable isolation
 var readOnlyOpt       = TransactionOptions.ReadOnlyMode;  // ReadOnly = true
+// WithTimeout always creates a new instance
 var timeoutOpt        = TransactionOptions.WithTimeout(TimeSpan.FromSeconds(10));
 
-// Custom Configuration via with-expressions (Zero Allocation)
+// Custom Configuration via with-expressions (allocates a new TransactionOptions record instance)
 var customOptions = TransactionOptions.Default with
 {
     IsolationLevel = TransactionIsolationLevel.Snapshot,
@@ -598,6 +641,80 @@ await transactionManager.ExecuteAsync(async context =>
 });
 ```
 
+### Entity Framework Core Enlistment (`EricksonLopez.Transaction.EntityFrameworkCore`)
+
+`EricksonLopez.Transaction.EntityFrameworkCore` bridges existing EF Core `DbContext` instances to the active transaction coordinator:
+
+```csharp
+using EricksonLopez.Transaction;
+using EricksonLopez.Transaction.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+
+public sealed class OrderEfRepository(OrderDbContext dbContext)
+{
+    public async Task SaveOrderAsync(Order order, ITransactionContext context, CancellationToken ct)
+    {
+        // Enlists the DbContext into the coordinator's active physical DbTransaction
+        await dbContext.UseTransactionAsync(context, ct);
+
+        await dbContext.Orders.AddAsync(order, ct);
+        await dbContext.SaveChangesAsync(ct);
+    }
+}
+```
+
+### Mediator Pipeline Behavior (`EricksonLopez.Transaction.Mediator`)
+
+Declaratively wrap command execution in an automated transactional boundary using `EricksonLopez.Transaction.Mediator`:
+
+```csharp
+using EricksonLopez.Mediator;
+using EricksonLopez.Transaction;
+using EricksonLopez.Transaction.Mediator;
+using EricksonLopez.Result;
+
+// 1. Register mediator pipeline behavior in Program.cs
+builder.Services.AddTransactionPipelineBehavior();
+
+// 2. Implement ITransactionalCommand and optional ITransactionalCommandOptions on command
+public sealed record CreateInvoiceCommand(Guid CustomerId, decimal Total) 
+    : ITransactionalCommand, ITransactionalCommandOptions
+{
+    public TransactionOptions TransactionOptions => TransactionOptions.Default with
+    {
+        IsolationLevel = TransactionIsolationLevel.ReadCommitted,
+        Timeout = TimeSpan.FromSeconds(20)
+    };
+}
+
+// 3. Command handler executes within an atomic transaction boundary.
+// Commits automatically on Result.Success; rolls back on exception or Result.Failure.
+public sealed class CreateInvoiceHandler : IRequestHandler<CreateInvoiceCommand, Result<Guid>>
+{
+    public async Task<Result<Guid>> Handle(CreateInvoiceCommand command, CancellationToken ct)
+    {
+        // Database operations execute within the ambient coordinator transaction
+        return Result<Guid>.Success(Guid.NewGuid());
+    }
+}
+```
+
+### Polly Resilience & Ambiguous Commit Policy (`EricksonLopez.Transaction.Resilience`)
+
+Handle ambiguous transaction commit states safely using Polly retry policies:
+
+```csharp
+using EricksonLopez.Transaction.Exceptions;
+using EricksonLopez.Transaction.Resilience;
+using Polly;
+
+// Handle ambiguous commits without naive retries of non-idempotent operations
+var retryPolicy = Policy
+    .Handle<TimeoutException>()
+    .HandleAmbiguousCommit() // Extension method from EricksonLopez.Transaction.Resilience
+    .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+```
+
 ### OpenTelemetry Distributed Tracing & Metrics
 
 `EricksonLopez.Transaction` publishes native OpenTelemetry telemetry under the `"EricksonLopez.Transaction"` identifier:
@@ -627,13 +744,16 @@ builder.Services.AddOpenTelemetry()
 
 ### Zero-Allocation Structured Logging
 
-The coordinator uses Roslyn `[LoggerMessage]` source generation to avoid string allocation and boxing overhead on critical execution paths:
+The coordinator uses Roslyn `[LoggerMessage]` source generation to emit structured, zero-boxing diagnostic events at compile time:
 
 ```csharp
-// Diagnostic logs emitted automatically by TransactionManager:
-// [DBG] Beginning transaction {TransactionId} with isolation {IsolationLevel}
-// [DBG] Committed transaction {TransactionId} in {DurationMs}ms
-// [WRN] Rolling back transaction {TransactionId} due to unhandled exception
+// Diagnostic log events emitted automatically by TransactionManager:
+
+// EventId=1 | LogLevel.Debug — Emitted when BeginAsync() is called with NestedBehavior.Suppress.
+// "Beginning suppressed transaction scope. Ambient context will be suspended."
+
+// EventId=2 | LogLevel.Warning — Emitted when a transaction times out before the operation completes.
+// "Transaction execution exceeded timeout of {Timeout}."
 ```
 
 ### Multi-Dialect Concurrency Error Classifiers
@@ -648,6 +768,14 @@ Each provider package exports a static error classifier to categorize vendor-spe
 | `EricksonLopez.Transaction.MariaDb` | `MariaDbErrorClassifier` | Error `1213` | Error `1205` | Error `1205` |
 | `EricksonLopez.Transaction.Oracle` | `OracleErrorClassifier` | `ORA-00060` | `ORA-08177` | `ORA-30006` |
 | `EricksonLopez.Transaction.Sqlite` | `SqliteErrorClassifier` | `SQLITE_BUSY` (5) | `SQLITE_LOCKED` (6) | `SQLITE_BUSY` (5) |
+
+### Roslyn Diagnostic Analyzers (`EricksonLopez.Transaction.Analyzers`)
+
+`EricksonLopez.Transaction.Analyzers` inspects syntax trees at compile time to enforce transaction boundary invariants:
+
+| Diagnostic ID | Severity | Category | Description | CodeFix / Remediation |
+|---|:---:|---|---|---|
+| `ELT001` | **Error** | Usage | Prohibits direct manual lifecycle calls (`Close()`, `Dispose()`, `DisposeAsync()`, `BeginTransaction()`, `BeginTransactionAsync()`, `ChangeDatabase()`) on `context.Connection`. | Remove explicit connection lifecycle mutations; allow `TransactionManager` to coordinate the connection and transaction lifecycle deterministically. |
 
 ---
 
@@ -679,7 +807,7 @@ public sealed class OrderServiceTests
         var tx = fakeManager.StartedTransactions[0];
         Assert.Equal(1, tx.CommitCount);
         Assert.Equal(0, tx.RollbackCount);
-        Assert.False(tx.IsDisposed); // Disposed after execution block exits
+        Assert.True(tx.IsDisposed); // Disposed automatically when ExecuteAsync completes
     }
 
     [Fact]
@@ -708,7 +836,7 @@ Compilation Quality:       100% (0 Warnings, 0 Errors under <TreatWarningsAsErro
 XML Documentation:         100% Coverage (CS1591 enforced on all public packages)
 Architecture Boundaries:   100% Passing (NetArchTest.Rules package segregation)
 Native AOT Smoke Tests:    36 / 36 Passing in closed-world Native AOT published binary
-Mutation Testing Score:    >= 95% Mutation Score across all 11 package Stryker matrices
+Mutation Testing Score:    >= 95% Mutation Score across all 15 package Stryker matrices
 Repository Governance:     0 Violations verified via scripts/verify-compliance.ps1
 ```
 
@@ -742,19 +870,25 @@ dotnet run --project benchmarks/EricksonLopez.Transaction.Benchmarks/EricksonLop
 
 ### Runtime & Native AOT Compatibility
 
-| Package | .NET 8.0 LTS | .NET 9.0 STS | .NET 10.0 | Native AOT | Trimmable | Strong Named |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| `EricksonLopez.Transaction.Abstractions` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `EricksonLopez.Transaction` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `EricksonLopez.Transaction.Dapper` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `EricksonLopez.Transaction.PostgreSql` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `EricksonLopez.Transaction.SqlServer` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `EricksonLopez.Transaction.MySql` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `EricksonLopez.Transaction.MariaDb` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `EricksonLopez.Transaction.Oracle` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `EricksonLopez.Transaction.Sqlite` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `EricksonLopez.Transaction.Result` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `EricksonLopez.Transaction.Testing` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Package | .NET 8.0 LTS | .NET 9.0 STS | .NET 10.0 | Native AOT | Trimmable | Strong Named | Notes |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|---|
+| `EricksonLopez.Transaction.Abstractions` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Pure BCL contracts, zero external dependencies |
+| `EricksonLopez.Transaction` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Core coordinator, state machine, OpenTelemetry, DI |
+| `EricksonLopez.Transaction.Dapper` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Fluent Dapper CommandDefinition binding |
+| `EricksonLopez.Transaction.PostgreSql` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | PostgreSQL provider with NpgsqlDataSource support |
+| `EricksonLopez.Transaction.SqlServer` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | SQL Server provider with deadlock error classifier |
+| `EricksonLopez.Transaction.MySql` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | MySQL provider with InnoDB error classifier |
+| `EricksonLopez.Transaction.MariaDb` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | MariaDB provider with Aria/InnoDB savepoints |
+| `EricksonLopez.Transaction.Oracle` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Oracle Database provider with ORA error classifier |
+| `EricksonLopez.Transaction.Sqlite` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | SQLite provider with WAL mode concurrency classifier |
+| `EricksonLopez.Transaction.Result` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Functional Result<T> monad auto-rollback integration |
+| `EricksonLopez.Transaction.Testing` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | In-memory test doubles (FakeTransactionManager) |
+| `EricksonLopez.Transaction.Mediator` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Mediator pipeline behavior for transactional commands |
+| `EricksonLopez.Transaction.EntityFrameworkCore` | ❌ (.NET 10+) | ❌ (.NET 10+) | ✅ | ✅ | ✅ | ✅ | Enlists DbContext into active transaction |
+| `EricksonLopez.Transaction.Resilience` | ❌ (.NET 10+) | ❌ (.NET 10+) | ✅ | ✅ | ✅ | ✅ | Polly retry policies for ambiguous commit states |
+| `EricksonLopez.Transaction.Analyzers` | ✅ (.NET Standard 2.0) | ✅ (.NET Standard 2.0) | ✅ (.NET Standard 2.0) | ✅ | ✅ | ✅ | Roslyn diagnostic analyzer enforcing ELT001 |
+
+> 🛡️ **Target Framework & Lifecycle Policy**: First-class multi-targeting across `.NET 10` (Modern LTS), `.NET 9` (STS), and `.NET 8` (Enterprise LTS) is actively maintained across core coordinator and relational dialect packages, while integration packages with newer runtime dependencies (`EntityFrameworkCore` and `Resilience`) target `.NET 10.0`, and Roslyn analyzers target `.NET Standard 2.0`. Backward compatibility for multi-targeted packages is guaranteed until Microsoft officially reaches End-of-Life (EOL) for .NET 8 and .NET 9 in November 2026.
 
 ### Database Engine & Savepoint Capability Matrix
 
@@ -766,6 +900,17 @@ dotnet run --project benchmarks/EricksonLopez.Transaction.Benchmarks/EricksonLop
 | **MariaDB** | `EricksonLopez.Transaction.MariaDb` | `SAVEPOINT`, `ROLLBACK TO SAVEPOINT` | InnoDB / Aria MVCC | `SET TRANSACTION READ ONLY;` |
 | **Oracle** | `EricksonLopez.Transaction.Oracle` | `SAVEPOINT`, `ROLLBACK TO SAVEPOINT` | Serialized / Read-Committed | `SET TRANSACTION READ ONLY;` |
 | **SQLite** | `EricksonLopez.Transaction.Sqlite` | `SAVEPOINT`, `RELEASE`, `ROLLBACK TO` | WAL Mode MVCC | `PRAGMA query_only = ON;` |
+
+### Concurrency Error Diagnostics & HTTP Status Mapping
+
+Mapping relational concurrency failures and transaction coordinator signals to RFC 9457 Problem Details HTTP status codes:
+
+| Concurrency Category | Dialect Codes / Exception | HTTP Status | Problem Details Type | Recommended Client Action |
+|---|---|:---:|---|---|
+| **Deadlock** | `40P01` (PG), `1205` (MSSQL/MySQL/MariaDB), `ORA-00060` (Oracle), `SQLITE_BUSY` (5) | `409 Conflict` | `https://httpstatuses.io/409` | Exponential backoff retry with jitter |
+| **Serialization Failure** | `40001` (PG), `3960`/`3961` (MSSQL), `1205` (MySQL/MariaDB), `ORA-08177` (Oracle), `SQLITE_LOCKED` (6) | `409 Conflict` | `https://httpstatuses.io/409` | Retry entire transaction boundary |
+| **Lock Timeout** | `55P03` (PG), `1222` (MSSQL), `1205` (MySQL/MariaDB), `ORA-30006` (Oracle), `SQLITE_BUSY` (5) | `504 Gateway Timeout` | `https://httpstatuses.io/504` | Optimize query execution, inspect lock contention |
+| **Ambiguous Commit** | `TransactionCommitException (IsAmbiguous = true)` | `503 Service Unavailable` | `https://httpstatuses.io/503` | Idempotent reconciliation / Outbox verification |
 
 ---
 
@@ -787,6 +932,9 @@ flowchart TD
         Dapper["EricksonLopez.Transaction.Dapper"]
         ResultPkg["EricksonLopez.Transaction.Result"]
         Testing["EricksonLopez.Transaction.Testing"]
+        EFCore["EricksonLopez.Transaction.EntityFrameworkCore"]
+        Med["EricksonLopez.Transaction.Mediator"]
+        Res["EricksonLopez.Transaction.Resilience"]
         PG["EricksonLopez.Transaction.PostgreSql"]
         MSSQL["EricksonLopez.Transaction.SqlServer"]
         MySQL["EricksonLopez.Transaction.MySql"]
@@ -799,6 +947,10 @@ flowchart TD
     Dapper --> Abs
     ResultPkg --> Abs
     Testing --> Abs
+    EFCore --> Abs
+    Med --> Abs
+    Med --> ResultPkg
+    Res --> Abs
     PG --> Abs
     PG --> Core
     MSSQL --> Abs
@@ -899,6 +1051,7 @@ flowchart TD
 | **Non-Transactional Work** | Leaving non-transactional calls inside active transaction | Suppressing context via `NestedTransactionBehavior.Suppress` |
 | **Options Allocation** | Instantiating dynamic configuration builders on hot paths | Using static presets (`TransactionOptions.Default`) or `with` expressions |
 | **Unit Testing** | Spinning up physical databases for simple domain tests | Using `FakeTransactionManager` and verifying commit/rollback counts |
+| **Connection Mutation** | Calling `context.Connection.Close()` or `Dispose()` manually | Allowing `TransactionManager` to coordinate lifecycle (enforced by Roslyn `ELT001`) |
 
 ---
 
@@ -931,6 +1084,11 @@ flowchart TD
 - **Symptom**: Background threads or un-awaited tasks lose access to the active transaction context.
 - **Cause**: Spawning unconfined threads via `Task.Run` without capturing the execution context can sever ambient `AsyncLocal` propagation.
 - **Solution**: Ensure all asynchronous operations within the transaction boundary are properly awaited.
+
+### 6. Direct Connection Lifecycle Call Hazard (`ELT001`)
+- **Symptom**: Roslyn compile-time error `ELT001: Do not invoke 'Close'/'Dispose' on the Connection property. This corrupts the transaction state machine.`
+- **Cause**: Invoking `Close()`, `Dispose()`, or `BeginTransaction()` directly on `context.Connection` instead of allowing the coordinator to manage lifecycle states.
+- **Solution**: Remove the manual connection lifecycle invocation. `TransactionManager` guarantees deterministic closing, disposal, and rollback upon scope completion.
 
 ---
 

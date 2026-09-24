@@ -2,13 +2,12 @@
   "stryker-config": {
     "ignore-methods": [
       "ConfigureAwait",
-      "Dispose",
-      "DisposeAsync"
+      "Dispose"
     ],
     "test-projects": [
-      "EricksonLopez.Transaction.Tests.csproj"
+      "EricksonLopez.Transaction.Mediator.Tests.csproj"
     ],
-    "project": "EricksonLopez.Transaction.csproj",
+    "project": "EricksonLopez.Transaction.Mediator.csproj",
     "reporters": [
       "html",
       "json",
@@ -27,6 +26,7 @@
       "high": 100,
       "low": 98
     },
-    "coverage-analysis": "all"
+    "coverage-analysis": "all",
+    "concurrency": 2
   }
 }

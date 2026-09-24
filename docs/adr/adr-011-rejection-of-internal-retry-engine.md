@@ -3,6 +3,9 @@
 ## Status
 Accepted (Rejection)
 
+## Date
+2026-09-04
+
 ## Context
 A recurring temptation in transaction libraries is embedding an internal retry loop (e.g. `options.MaxRetries = 3`) within the `ITransactionManager.ExecuteAsync` method.
 

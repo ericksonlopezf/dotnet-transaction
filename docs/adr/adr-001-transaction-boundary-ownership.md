@@ -3,6 +3,9 @@
 ## Status
 Accepted
 
+## Date
+2026-09-04
+
 ## Context
 In enterprise .NET Clean Architecture applications using Domain-Driven Design (DDD) and Dapper with PostgreSQL, persistence operations often span multiple aggregate roots, outbox message tables, and idempotency stores within a single business use case. 
 

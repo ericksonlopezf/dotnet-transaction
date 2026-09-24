@@ -8,7 +8,7 @@
 
 ## 1. Published Packages Catalog
 
-All packages are published to NuGet targeting **.NET 8.0, .NET 9.0, and .NET 10.0 (`net8.0;net9.0;net10.0`)**, compiled with `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`, `<IsAotCompatible>true</IsAotCompatible>`, and `<EnableTrimAnalyzer>true</EnableTrimAnalyzer>`.
+Packages in the ecosystem are published to NuGet with strong typing, compiled with `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`, `<IsAotCompatible>true</IsAotCompatible>`, and `<EnableTrimAnalyzer>true</EnableTrimAnalyzer>`. Core coordinator, dialect, testing, dapper, result, and mediator packages target **.NET 8.0, .NET 9.0, and .NET 10.0 (`net8.0;net9.0;net10.0`)**, while `EntityFrameworkCore` and `Resilience` target **.NET 10.0 (`net10.0`)**, and `Analyzers` targets **.NET Standard 2.0 (`netstandard2.0`)** as detailed in the matrix below.
 
 | Package ID | Assembly Name | Description | Direct Dependencies | Target Frameworks |
 |---|---|---|---|---|
@@ -23,6 +23,10 @@ All packages are published to NuGet targeting **.NET 8.0, .NET 9.0, and .NET 10.
 | [`EricksonLopez.Transaction.Sqlite`](https://www.nuget.org/packages/EricksonLopez.Transaction.Sqlite) | `EricksonLopez.Transaction.Sqlite.dll` | SQLite connection factory and concurrency error classifier. | `EricksonLopez.Transaction.Abstractions`, `EricksonLopez.Transaction`, `Microsoft.Data.Sqlite`, `Microsoft.Extensions.DependencyInjection.Abstractions` | `net8.0;net9.0;net10.0` |
 | [`EricksonLopez.Transaction.Result`](https://www.nuget.org/packages/EricksonLopez.Transaction.Result) | `EricksonLopez.Transaction.Result.dll` | Functional `Result<T>` monad integration with automatic rollback on failure. | `EricksonLopez.Transaction.Abstractions`, `EricksonLopez.Result` | `net8.0;net9.0;net10.0` |
 | [`EricksonLopez.Transaction.Testing`](https://www.nuget.org/packages/EricksonLopez.Transaction.Testing) | `EricksonLopez.Transaction.Testing.dll` | In-memory test doubles (`FakeTransactionManager`, `FakeTransactionContext`). | `EricksonLopez.Transaction.Abstractions` | `net8.0;net9.0;net10.0` |
+| [`EricksonLopez.Transaction.Mediator`](https://www.nuget.org/packages/EricksonLopez.Transaction.Mediator) | `EricksonLopez.Transaction.Mediator.dll` | Mediator pipeline behavior for declarative command boundaries and auto-rollback. | `Abstractions`, `Result`, `EricksonLopez.Mediator`, `EricksonLopez.Result` | `net8.0;net9.0;net10.0` |
+| [`EricksonLopez.Transaction.EntityFrameworkCore`](https://www.nuget.org/packages/EricksonLopez.Transaction.EntityFrameworkCore) | `EricksonLopez.Transaction.EntityFrameworkCore.dll` | EF Core `DbContext` transaction enlistment bridge (`UseTransactionAsync`). | `Abstractions`, `Microsoft.EntityFrameworkCore.Relational` | `net10.0` |
+| [`EricksonLopez.Transaction.Resilience`](https://www.nuget.org/packages/EricksonLopez.Transaction.Resilience) | `EricksonLopez.Transaction.Resilience.dll` | Polly retry policy extensions for ambiguous commit handling. | `Abstractions`, `Polly` | `net10.0` |
+| [`EricksonLopez.Transaction.Analyzers`](https://www.nuget.org/packages/EricksonLopez.Transaction.Analyzers) | `EricksonLopez.Transaction.Analyzers.dll` | Roslyn diagnostic analyzer enforcing connection safety (`ELT001`). | `Microsoft.CodeAnalysis.CSharp` | `netstandard2.0` |
 
 ---
 
@@ -32,25 +36,35 @@ Dependency versions are centrally declared in `Directory.Packages.props` (`Manag
 
 | Package Dependency | Centrally Pinned Version | Purpose / Scope |
 |---|---|---|
+| `Microsoft.SourceLink.GitHub` | `8.0.0` | SourceLink Git metadata embedding. |
+| `EricksonLopez.Result` | `2.0.0` | Monadic result pattern primitives. |
+| `EricksonLopez.Mediator` | `1.0.0` | CQRS mediator interfaces and pipeline abstractions. |
 | `Microsoft.Extensions.DependencyInjection.Abstractions` | `10.0.11` | Dependency injection container abstractions. |
 | `Microsoft.Extensions.DependencyInjection` | `10.0.11` | Dependency injection container provider. |
 | `Microsoft.Extensions.Options` | `10.0.11` | Strongly-typed options configuration binding. |
 | `Microsoft.Extensions.Logging.Abstractions` | `10.0.11` | High-performance structured logging abstractions. |
-| `OpenTelemetry.Api` | `1.11.2` | Distributed tracing ActivitySource and Meter instruments. |
+| `OpenTelemetry.Api` | `1.18.0` | Distributed tracing ActivitySource and Meter instruments. |
+| `Polly` | `8.4.1` | Fault handling and resilience policies. |
 | `Dapper` | `2.1.79` | High-performance micro-ORM object mapper and command definitions. |
 | `Npgsql` | `10.0.3` | High-performance ADO.NET provider for PostgreSQL. |
-| `Microsoft.Data.SqlClient` | `5.2.2` | Official ADO.NET provider for Microsoft SQL Server. |
-| `MySqlConnector` | `2.4.0` | High-performance asynchronous ADO.NET provider for MySQL and MariaDB. |
-| `Oracle.ManagedDataAccess.Core` | `23.7.0` | Official managed ADO.NET provider for Oracle Database. |
-| `Microsoft.Data.Sqlite` | `10.0.3` | Lightweight ADO.NET provider for SQLite. |
+| `Microsoft.Data.SqlClient` | `7.0.2` | Official ADO.NET provider for Microsoft SQL Server. |
+| `MySqlConnector` | `2.6.2` | High-performance asynchronous ADO.NET provider for MySQL and MariaDB. |
+| `Oracle.ManagedDataAccess.Core` | `23.26.300` | Official managed ADO.NET provider for Oracle Database. |
+| `Microsoft.Data.Sqlite` | `10.0.11` | Lightweight ADO.NET provider for SQLite. |
+| `Microsoft.EntityFrameworkCore.Relational` | `10.0.11` | Relational database support for Entity Framework Core. |
+| `Microsoft.EntityFrameworkCore.Sqlite` | `10.0.11` | SQLite provider for Entity Framework Core. |
 | `Microsoft.NET.Test.Sdk` | `18.9.0` | Test platform runner integration. |
 | `xunit` | `2.9.3` | Developer testing framework. |
-| `xunit.runner.visualstudio` | `3.0.2` | Test runner adapter for IDEs and CI. |
+| `xunit.runner.visualstudio` | `4.0.0` | Test runner adapter for IDEs and CI. |
 | `AwesomeAssertions` | `9.6.0` | Fluent assertions for unit test suites. |
-| `NSubstitute` | `5.3.0` | Mocking and test double library. |
+| `NSubstitute` | `6.2.0` | Mocking and test double library. |
 | `NetArchTest.Rules` | `1.3.2` | Architectural boundary enforcement tests. |
-| `coverlet.collector` | `6.0.4` | Cross-platform code coverage collector. |
+| `coverlet.collector` | `10.0.1` | Cross-platform code coverage collector. |
 | `BenchmarkDotNet` | `0.15.8` | Micro-benchmarking harness for hot-path measurements. |
+| `Microsoft.CodeAnalysis.Analyzers` | `3.11.0` | Roslyn analyzer rules for analyzers. |
+| `Microsoft.CodeAnalysis.CSharp` | `4.12.0` | Roslyn C# syntax and semantic analysis. |
+| `Testcontainers.PostgreSql` | `3.9.0` | Ephemeral PostgreSQL container for integration testing. |
+| `Testcontainers.MsSql` | `3.9.0` | Ephemeral SQL Server container for integration testing. |
 
 ---
 
@@ -96,3 +110,22 @@ dotnet run --project samples/Showcase/EricksonLopez.Transaction.Showcase.csproj 
 # Run interactive console menu
 dotnet run --project samples/Showcase/EricksonLopez.Transaction.Showcase.csproj --framework net10.0
 ```
+
+---
+
+## 6. GitHub Repository Metadata & SEO Taxonomy
+
+Official GitHub repository metadata configured for [github.com/ericksonlopezf/dotnet-transaction](https://github.com/ericksonlopezf/dotnet-transaction):
+
+### Description
+> `High-performance, explicit, composable, and Native AOT-ready relational database transaction coordinator for modern .NET 8, .NET 9, and .NET 10 applications.`
+
+### Official Topics (20 / 20)
+| Category | Topics |
+|---|---|
+| **Platform & Runtime** | `dotnet`, `csharp`, `native-aot` |
+| **Transaction Core & Scopes** | `transaction`, `transaction-manager`, `transaction-scope`, `savepoints`, `ambient-context` |
+| **Architectural Patterns** | `unit-of-work`, `clean-architecture`, `cqrs`, `result-pattern` |
+| **Data Access & Engines** | `ado-net`, `dapper`, `entity-framework-core`, `postgresql`, `sql-server` |
+| **Resilience, Quality & Tooling** | `opentelemetry`, `resilience`, `roslyn-analyzer` |
+

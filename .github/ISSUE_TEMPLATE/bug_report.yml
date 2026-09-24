@@ -22,6 +22,22 @@ body:
       placeholder: .NET 10.0.100 (Linux / Windows / macOS)
     validations:
       required: true
+  - type: dropdown
+    id: database-engine
+    attributes:
+      label: Database Engine / Provider
+      description: Which database provider or dialect are you targeting?
+      options:
+        - PostgreSQL (Npgsql)
+        - Microsoft SQL Server (Microsoft.Data.SqlClient)
+        - MySQL (MySqlConnector)
+        - MariaDB (MySqlConnector)
+        - Oracle Database (Oracle.ManagedDataAccess.Core)
+        - SQLite (Microsoft.Data.Sqlite)
+        - In-Memory Fake (EricksonLopez.Transaction.Testing)
+        - N/A or Other
+    validations:
+      required: true
   - type: textarea
     id: description
     attributes:

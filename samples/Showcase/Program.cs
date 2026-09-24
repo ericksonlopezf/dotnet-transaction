@@ -164,7 +164,7 @@ public static class Program
         Console.WriteLine("""
 ================================================================================
   EricksonLopez.Transaction — Official Showcase & Executable Reference
-  Version 1.0.0 | .NET 10.0 | C# 14 | Native AOT Ready
+  Version 2.0.0 | .NET 10.0 | C# 14 | Native AOT Ready
 ================================================================================
 """);
         Console.ResetColor();

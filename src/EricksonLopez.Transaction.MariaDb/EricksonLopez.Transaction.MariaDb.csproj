@@ -7,7 +7,7 @@
     <AssemblyName>EricksonLopez.Transaction.MariaDb</AssemblyName>
     <Description>MariaDB connection factory, transaction extensions, and MariaDB error code classifier for EricksonLopez.Transaction using MySqlConnector.</Description>
     <PackageId>EricksonLopez.Transaction.MariaDb</PackageId>
-    <PackageTags>$(CommonPackageTags);mariadb;mysqlconnector;savepoints;deadlock-detection;database-provider</PackageTags>
+    <PackageTags>$(CommonPackageTags);mariadb;mysqlconnector;savepoint;deadlock-detection;database-provider;native-aot</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

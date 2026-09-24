@@ -6,8 +6,8 @@
 
 | Version | Supported          | Security Fixes |
 | ------- | ------------------ | -------------- |
-| 1.1.x   | :white_check_mark: | Active         |
-| 1.0.x   | :white_check_mark: | Active         |
+| 2.0.x   | :white_check_mark: | Active         |
+| 1.0.x   | :white_check_mark: | Maintenance    |
 | < 1.0.0 | :x:                | None (EOL)     |
 
 ---
@@ -32,7 +32,8 @@ If you discover a potential security vulnerability in `EricksonLopez.Transaction
 
 - **Strong Name Signing**: All production assemblies are signed with a strong name key (`EricksonLopez.snk`) to guarantee binary identity integrity. The key is stored as the GitHub Actions secret `SNK_KEY` (Base64-encoded) and restored at build time — the private key material is never committed to the repository. The corresponding public key token is embedded in `Directory.Build.props`.
 - **SourceLink & Symbol Packages**: All NuGet packages embed SourceLink metadata (`PublishRepositoryUrl=true`, `EmbedUntrackedSources=true`) and publish corresponding `.snupkg` symbol packages for deterministic, reproducible debugging.
-- **NuGet Publishing via API Key**: Packages are published to `https://api.nuget.org/v3/index.json` using the `NUGET_API_KEY` GitHub Actions secret (stored as a repository secret, never committed). The `--skip-duplicate` flag prevents accidental re-publication of existing versions.
+- **Sigstore Provenance Attestation**: Release workflows generate cryptographic build provenance attestations using Sigstore (`actions/attest-build-provenance`), providing tamper-proof evidence linking published `.nupkg` binaries to the exact commit SHA and GitHub Actions run.
+- **NuGet Trusted Publishing (OIDC)**: Packages are published to `https://api.nuget.org/v3/index.json` using OpenID Connect (OIDC) via `NuGet/login`. This eliminates long-lived static API keys in favor of short-lived, cryptographically signed tokens. The `--skip-duplicate` flag prevents accidental re-publication of existing versions.
 - **Dependency Minimization**: The core library (`EricksonLopez.Transaction`) depends only on standard BCL abstractions and official Microsoft Extensions, avoiding unvetted third-party runtime dependencies. All package versions are centrally pinned in `Directory.Packages.props`.
 - **Automated Dependency Updates**: Dependabot is configured to scan NuGet dependencies and GitHub Actions workflows weekly, opening pull requests for outdated packages grouped by ecosystem (Microsoft dependencies, testing dependencies).
 - **Native AOT Trimming Verification**: Trimming analyzers (`EnableTrimAnalyzer=true`) and a dedicated `AotSmokeTest` binary ensure no dynamic reflection vulnerabilities or runtime code injection paths exist in any published package.

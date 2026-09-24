@@ -23,7 +23,7 @@ $ErrorActionPreference = "Stop"
 $violations = [System.Collections.Generic.List[string]]::new()
 
 Write-Host "============================================================" -ForegroundColor Cyan
-Write-Host "  EricksonLopez.Transaction — Convention & Quality Gate     " -ForegroundColor Cyan
+Write-Host "  EricksonLopez.Transaction - Convention and Quality Gate   " -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
 
 # ─── 1. License Header Check ──────────────────────────────────────────────
