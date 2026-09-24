@@ -3,6 +3,9 @@
 ## Status
 Accepted
 
+## Date
+2026-09-04
+
 ## Context
 The NEXT-horizon roadmap item "Logging Decision" required an explicit architectural decision: either **activate** `Microsoft.Extensions.Logging.ILogger<TransactionManager>` for structured diagnostic logging within the core transaction engine, or **eliminate** the dependency entirely if unused.
 

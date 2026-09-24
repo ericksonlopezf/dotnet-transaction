@@ -16,7 +16,7 @@ public sealed class TransactionDiagnosticsTests
     public void Constants_ShouldMatchExpectedValues()
     {
         TransactionDiagnostics.SourceName.Should().Be("EricksonLopez.Transaction");
-        TransactionDiagnostics.Version.Should().Be("1.0.0");
+        TransactionDiagnostics.Version.Should().Be("2.0.0");
         TransactionDiagnostics.ActivitySource.Name.Should().Be("EricksonLopez.Transaction");
         TransactionDiagnostics.Meter.Name.Should().Be("EricksonLopez.Transaction");
     }

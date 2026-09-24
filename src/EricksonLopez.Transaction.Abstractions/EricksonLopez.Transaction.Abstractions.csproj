@@ -7,7 +7,7 @@
     <AssemblyName>EricksonLopez.Transaction.Abstractions</AssemblyName>
     <Description>Core abstractions, interfaces, options, and primitives for EricksonLopez.Transaction.</Description>
     <PackageId>EricksonLopez.Transaction.Abstractions</PackageId>
-    <PackageTags>$(CommonPackageTags);abstractions;interfaces;savepoints;transaction-scope;nested-transactions;isolation-levels;ambient-context</PackageTags>
+    <PackageTags>$(CommonPackageTags);abstractions;transaction-scope;ambient-context;nested-transaction;savepoint;isolation-level;native-aot</PackageTags>
   </PropertyGroup>
 
 </Project>

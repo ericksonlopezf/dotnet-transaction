@@ -21,7 +21,7 @@ graph TD
     end
 
     subgraph Main_Mutation ["Async Deferred Quality Gate (.github/workflows/mutation-testing.yml)"]
-        G[Push to main / Weekly Cron / Dispatch] --> H[Stryker Matrix: 11 Packages<br/>Timeout: 180m | Concurrency: Cancel In-Progress]
+        G[Push to main / Weekly Cron / Dispatch] --> H[Stryker Matrix: 15 Packages<br/>Timeout: 180m | Concurrency: Cancel In-Progress]
         H --> I[Record Package Summaries<br/>HTML/JSON Artifacts]
         I --> J[Consolidated Quality Gate Job]
         J --> K[Publish Commit Status<br/>mutation-testing/stryker >=95%]
@@ -85,10 +85,10 @@ The repository defines 10 specialized GitHub Actions workflows:
 | **Continuous Integration** | `.github/workflows/ci.yml` | `push`, `pull_request` (`main`, `develop`) | Fast PR entry point calling compliance, build-test, and AOT smoke test. **Stryker is omitted** to preserve fast PR turnaround. |
 | **Build & Test** | `.github/workflows/dotnet-build-test.yml` | `workflow_call`, `workflow_dispatch` | Restores, builds Release, executes tests on .NET 8, 9, 10, collects Cobertura coverage, and uploads to Codecov. |
 | **Native AOT Smoke Test** | `.github/workflows/aot-smoke-test.yml` | `workflow_call`, `workflow_dispatch` | Publishes `EricksonLopez.Transaction.AotSmokeTest` as self-contained Linux-x64 binary and runs all 36 AOT tests. |
-| **Mutation Testing** | `.github/workflows/mutation-testing.yml` | `push` (`main`), Weekly Sunday cron (`0 3 * * 0`), `workflow_dispatch`, `workflow_call` | Runs Stryker.NET across 11-package matrix, records scores, aggregates quality gate, and posts `mutation-testing/stryker` commit status. |
-| **Publish Packages** | `.github/workflows/publish.yml` | `release` (`published`), `workflow_dispatch` | Validates mutation gate for target commit SHA via `scripts/verify-mutation-gate.js` with conditional Stryker execution before packing and publishing to NuGet. |
-| **Repository Compliance** | `.github/workflows/repo-compliance.yml` | `workflow_call`, `pull_request`, `workflow_dispatch` | Runs `scripts/verify-compliance.ps1` enforcing 9 architectural and governance rules. |
-| **Release Please** | `.github/workflows/release-please.yml` | `push` (`main`) | Automates Semantic Versioning releases and changelog generation. |
+| **Mutation Testing** | `.github/workflows/mutation-testing.yml` | `push` (`main`), Weekly Monday cron (`0 4 * * 1`), `workflow_dispatch`, `workflow_call` | Runs Stryker.NET across 15-package matrix, records scores, aggregates quality gate, and posts `mutation-testing/stryker` commit status. |
+| **Publish Packages** | `.github/workflows/publish.yml` | `push` (tags `v*.*.*`), `workflow_dispatch` | Validates mutation gate for target commit SHA via `scripts/verify-mutation-gate.js` with conditional Stryker execution, signs with Strong Name, generates Sigstore provenance attestation, and publishes to NuGet via OIDC. |
+| **Repository Compliance** | `.github/workflows/repo-compliance.yml` | `workflow_call`, `pull_request`, `workflow_dispatch` | Runs `scripts/verify-compliance.ps1` enforcing architectural and governance rules. |
+| **Release Please** | `.github/workflows/release-please.yml` | `push` (`main`) | Automates Semantic Versioning releases and triggers `publish.yml` via workflow dispatch. |
 | **Benchmarks** | `.github/workflows/benchmarks.yml` | `workflow_call`, `workflow_dispatch` | Executes on-demand BenchmarkDotNet suites and uploads markdown summaries to GitHub step summaries. |
 | **Benchmark Regression Gate** | `.github/workflows/benchmark-regression-gate.yml` | `pull_request` on `src/**` & `benchmarks/**` | Compares PR benchmark performance against committed baselines with a 10% regression threshold gate. |
 | **Weekly Benchmarks** | `.github/workflows/weekly-benchmarks.yml` | Weekly Sunday cron (`0 2 * * 0`), `workflow_dispatch` | Cross-TFM benchmark suite run; commits updated baselines to `benchmarks/results/`. |
@@ -99,9 +99,12 @@ The repository defines 10 specialized GitHub Actions workflows:
 
 | Secret Name | Referenced In | Purpose |
 |---|---|---|
-| `SNK_KEY` | `ci.yml`, `dotnet-build-test.yml`, `aot-smoke-test.yml`, `publish.yml`, `mutation-testing.yml`, `benchmarks.yml`, `weekly-benchmarks.yml`, `benchmark-regression-gate.yml` | Base64-encoded strong naming private key restored as `EricksonLopez.snk`. |
-| `CODECOV_TOKEN` | `ci.yml`, `dotnet-build-test.yml` | Authentication token for uploading Cobertura coverage reports to Codecov. |
-| `NUGET_API_KEY` | `publish.yml` | NuGet publishing API key for pushes to `https://api.nuget.org/v3/index.json`. |
+| `SNK_KEY` | `ci.yml`, `dotnet-build-test.yml`, `aot-smoke-test.yml`, `benchmark-regression-gate.yml`, `benchmarks.yml`, `mutation-testing.yml`, `publish.yml`, `weekly-benchmarks.yml` | Base64-encoded strong naming private key restored as `EricksonLopez.snk`. |
+| `CODECOV_TOKEN` | `ci.yml`, `dotnet-build-test.yml`, `publish.yml` | Authentication token for uploading Cobertura coverage reports to Codecov. |
+| `SONAR_TOKEN` | `ci.yml`, `dotnet-build-test.yml` | SonarCloud token for static code analysis and quality gate reporting. |
+| `GITHUB_TOKEN` | `dotnet-build-test.yml`, `mutation-testing.yml`, `release-please.yml` | GitHub authentication token for status check reporting, PR releases, and workflow automation. |
+
+> **Supply Chain Note**: NuGet package publishing does NOT use static API key secrets. Publishing is authenticated via **NuGet Trusted Publishing (OIDC)** using `NuGet/login@v1` with GitHub Actions identity tokens, combined with **Sigstore Provenance Attestation** (`actions/attest-build-provenance@v2.2.3`).
 
 ---
 
@@ -156,7 +159,7 @@ The release gate script (`scripts/verify-mutation-gate.js`) programmatically ans
 
 ### 6.3. Threshold Policy & Single Source of Truth
 
-Thresholds are centralized in `stryker-config.json` and 11 package-specific configs:
+Thresholds are centralized across all 15 package-specific configuration files:
 
 ```json
 {
@@ -175,18 +178,21 @@ Thresholds are centralized in `stryker-config.json` and 11 package-specific conf
 
 ### 6.4. Matrix Configuration Files
 
-1. `stryker-config.json` (Root / Core fallback)
-2. `stryker-core-config.json` (`EricksonLopez.Transaction`)
-3. `stryker-abstractions-config.json` (`EricksonLopez.Transaction.Abstractions`)
-4. `stryker-dapper-config.json` (`EricksonLopez.Transaction.Dapper`)
-5. `stryker-postgresql-config.json` (`EricksonLopez.Transaction.PostgreSql`)
-6. `stryker-sqlserver-config.json` (`EricksonLopez.Transaction.SqlServer`)
-7. `stryker-mysql-config.json` (`EricksonLopez.Transaction.MySql`)
-8. `stryker-mariadb-config.json` (`EricksonLopez.Transaction.MariaDb`)
-9. `stryker-oracle-config.json` (`EricksonLopez.Transaction.Oracle`)
-10. `stryker-sqlite-config.json` (`EricksonLopez.Transaction.Sqlite`)
-11. `stryker-result-config.json` (`EricksonLopez.Transaction.Result`)
-12. `stryker-testing-config.json` (`EricksonLopez.Transaction.Testing`)
+1. `stryker-core-config.json` (`EricksonLopez.Transaction`)
+2. `stryker-abstractions-config.json` (`EricksonLopez.Transaction.Abstractions`)
+3. `stryker-dapper-config.json` (`EricksonLopez.Transaction.Dapper`)
+4. `stryker-postgresql-config.json` (`EricksonLopez.Transaction.PostgreSql`)
+5. `stryker-sqlserver-config.json` (`EricksonLopez.Transaction.SqlServer`)
+6. `stryker-mysql-config.json` (`EricksonLopez.Transaction.MySql`)
+7. `stryker-mariadb-config.json` (`EricksonLopez.Transaction.MariaDb`)
+8. `stryker-oracle-config.json` (`EricksonLopez.Transaction.Oracle`)
+9. `stryker-sqlite-config.json` (`EricksonLopez.Transaction.Sqlite`)
+10. `stryker-result-config.json` (`EricksonLopez.Transaction.Result`)
+11. `stryker-testing-config.json` (`EricksonLopez.Transaction.Testing`)
+12. `stryker-analyzers-config.json` (`EricksonLopez.Transaction.Analyzers`)
+13. `stryker-efcore-config.json` (`EricksonLopez.Transaction.EntityFrameworkCore`)
+14. `stryker-mediator-config.json` (`EricksonLopez.Transaction.Mediator`)
+15. `stryker-resilience-config.json` (`EricksonLopez.Transaction.Resilience`)
 
 ---
 

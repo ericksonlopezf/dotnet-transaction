@@ -1,40 +1,56 @@
 # Copyright © Erickson Lopez. MIT License.
 
-# .NET Build Outputs
-bin/
-obj/
-**/bin/
-**/obj/
+# ==============================================================================
+# .NET Build Outputs & Intermediate Files
+# ==============================================================================
+[Bb]in/
+[Oo]bj/
 aot-output/
 *.binlog
-
-# Strong Name Keys
-# *.snk (Allowed for open source projects with public keys)
-!public.snk
-
-# Backup & Temp files
-*.bak
 *.tmp
 *.temp
+*.bak
 
-# NuGet packages
+# ==============================================================================
+# Strong Name Keys & Cryptographic Certificates
+# ==============================================================================
+# Ignore private signing keys by default while preserving public repository keys
+*.snk
+!EricksonLopez.snk
+!public.snk
+!*.pub.snk
+*.pfx
+*.p12
+
+# ==============================================================================
+# NuGet Packaging & Package Restore Artifacts
+# ==============================================================================
 artifacts/
 nupkgs/
 *.nupkg
 *.snupkg
+**/packages/
+!**/packages/build/
+project.lock.json
+project.assets.json
 
-# Visual Studio / Rider / Resharper
+# ==============================================================================
+# Visual Studio / JetBrains Rider / ReSharper
+# ==============================================================================
 .vs/
+.idea/
 *.user
+*.userprefs
 *.suo
 *.userosscache
 *.sln.docstates
-.idea/
-*.sln.iml
 *.DotSettings.user
+*.sln.iml
 _ReSharper*/
 
+# ==============================================================================
 # Visual Studio Code
+# ==============================================================================
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
@@ -42,11 +58,11 @@ _ReSharper*/
 !.vscode/extensions.json
 *.code-workspace
 
-# Test, Stryker & Benchmark Artifacts
-[Tt]est[Rr]esults*/
-test-results/
-**/TestResults/
-**/test-results/
+# ==============================================================================
+# Test Results, Stryker Mutation & Code Coverage
+# ==============================================================================
+[Tt]est[Rr]esults/
+[Tt]est-[Rr]esults/
 [Cc]overage[Rr]eport*/
 coverage-report*/
 coverage-results/
@@ -59,21 +75,53 @@ temp-coverage-report/
 *.opencover.xml
 coverage.*/
 **/coverage.*
-StrykerOutput/
+[Ss]tryker[Oo]utput/
+**/StrykerOutput/
 diag.log
-BenchmarkDotNet.Artifacts/
-benchmarks/results/*.log
+stryker.log
 
-# Node / Script Tooling (Mutation Testing Scripts)
+# ==============================================================================
+# Performance Benchmarks (BenchmarkDotNet)
+# ==============================================================================
+BenchmarkDotNet.Artifacts/
+**/BenchmarkDotNet.Artifacts/
+benchmarks/results/*.log
+benchmarks/**/BenchmarkDotNet.Artifacts/
+
+# ==============================================================================
+# Scripts & Tooling (Node, Python, Automation)
+# ==============================================================================
 node_modules/
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
 
-# Secrets & Local Config
-appsettings.Development.json
+# ==============================================================================
+# Local Secrets & Environment Configuration
+# ==============================================================================
+appsettings.*.local.json
 appsettings.Local.json
+appsettings.Development.json
 secrets.json
+.env
+.env.*.local
+*.env
 
-# OS files
+# ==============================================================================
+# Operating System Files (Windows, macOS, Linux)
+# ==============================================================================
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
 Thumbs.db
+ehthumbs.db
 [Dd]esktop.ini
+$RECYCLE.BIN/

@@ -3,6 +3,9 @@
 ## Status
 Accepted
 
+## Date
+2026-09-04
+
 ## Context
 Modern cloud-native databases (including PostgreSQL, MySQL, MariaDB, and read-replica routing clusters) provide specialized performance optimizations, lower lock contention, and strict write-prevention invariants for read-only transactions. In ADO.NET, setting `IsolationLevel` does not communicate read-only intent to the database engine.
 

@@ -47,7 +47,7 @@ public interface ITransaction : IAsyncDisposable
     /// Creates a named savepoint within this transaction.
     /// </summary>
     /// <param name="name">The unique name that identifies the savepoint within the transaction.</param>
-    /// <param name="cancellationToken">A token to observe while waiting for the task to complete.</param>
+    /// <param name="cancellationToken">A token that can be used to cancel the asynchronous operation.</param>
     /// <returns>A task that represents the asynchronous operation. The task result contains the created <see cref="ISavepoint"/>.</returns>
     Task<ISavepoint> CreateSavepointAsync(string name, CancellationToken cancellationToken = default);
 }

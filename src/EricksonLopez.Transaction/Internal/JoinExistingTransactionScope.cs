@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace EricksonLopez.Transaction.Internal;
 
 /// <summary>
-/// Nested transaction scope adapter that participates in an existing active transaction without creating savepoints.
+/// Represents a nested transaction scope adapter that participates in an existing active transaction without creating savepoints.
 /// </summary>
 internal sealed class JoinExistingTransactionScope : ITransaction
 {
@@ -42,6 +42,7 @@ internal sealed class JoinExistingTransactionScope : ITransaction
     public Task RollbackAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        _parentContext.SetRollbackOnly("Inner JoinExisting scope rolled back.");
         _stateMachine.TransitionToRolledBack();
         return Task.CompletedTask;
     }
@@ -56,10 +57,16 @@ internal sealed class JoinExistingTransactionScope : ITransaction
     /// <inheritdoc/>
     public ValueTask DisposeAsync()
     {
+        if (_disposed)
+        {
+            return ValueTask.CompletedTask;
+        }
+
         _disposed = true;
 
         if (_stateMachine.CurrentState == TransactionState.Active)
         {
+            _parentContext.SetRollbackOnly("Inner JoinExisting scope disposed without committing.");
             _stateMachine.TransitionToDisposed();
         }
 

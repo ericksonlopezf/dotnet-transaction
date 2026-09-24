@@ -77,6 +77,8 @@ public interface ITransactionContext : IAsyncDisposable
 | `IsolationLevel` | `TransactionIsolationLevel IsolationLevel { get; }` | The isolation level configured for this transaction. |
 | `CancellationToken` | `CancellationToken CancellationToken { get; }` | The cancellation token scoped to this transaction execution. |
 | `Enlistments` | `IReadOnlyList<ITransactionEnlistment> Enlistments { get; }` | The list of enlistments attached to this transaction lifecycle. |
+| `IsRollbackOnly` | `bool IsRollbackOnly { get; }` | Gets a value indicating whether this transaction context has been marked rollback-only. |
+| `SetRollbackOnly` | `void SetRollbackOnly(string reason)` | Marks this transaction context as rollback-only, preventing subsequent commits. |
 | `CreateSavepointAsync` | `Task<ISavepoint> CreateSavepointAsync(string name, CancellationToken cancellationToken = default)` | Creates a named savepoint within this transaction for partial rollback. |
 | `Enlist` | `void Enlist(ITransactionEnlistment enlistment)` | Enlists a participant in the lifecycle notifications of this transaction. |
 
@@ -130,6 +132,24 @@ public interface IDbConnectionFactory
 
 ---
 
+### `IDatabaseDialect` (interface)
+
+Provides an abstraction over database-specific syntax and behaviors for savepoint commands and read-only mode settings.
+
+```csharp
+public interface IDatabaseDialect
+```
+
+| Member | Signature | Description |
+|---|---|---|
+| `CanHandle` | `bool CanHandle(DbConnection connection)` | Determines whether this dialect can handle the specified database connection. |
+| `ApplyReadOnlyModeAsync` | `Task ApplyReadOnlyModeAsync(DbConnection connection, DbTransaction transaction, CancellationToken cancellationToken = default)` | Applies a read-only transaction mode to the underlying database transaction if supported. |
+| `GetSavepointCreationSql` | `string GetSavepointCreationSql(string savepointName)` | Gets the SQL command text to create a named savepoint. |
+| `GetSavepointRollbackSql` | `string GetSavepointRollbackSql(string savepointName)` | Gets the SQL command text to rollback to a named savepoint. |
+| `GetSavepointReleaseSql` | `string? GetSavepointReleaseSql(string savepointName)` | Gets the SQL command text to release a named savepoint, or `null` if unsupported. |
+
+---
+
 ### `TransactionOptions` (sealed record)
 
 Immutable configuration options for controlling transaction behavior, isolation level, timeout, and nesting semantics.
@@ -145,13 +165,14 @@ public sealed record TransactionOptions
 | `ReadOnly` | `bool` (`false`) | Opens the transaction in read-only mode where supported by the provider. |
 | `NestedBehavior` | `NestedTransactionBehavior` (`UseSavepoint`) | Behavior applied when nested inside an existing active transaction. |
 | `TransactionName` | `string?` (`null`) | Optional logical name used in diagnostics and structured logging. |
+| `SanitizeTelemetryMetadata` | `bool` (`false`) | When `true`, replaces `transaction.id` and `transaction.name` OTel span tags with `[REDACTED]`. Does not redact SQL parameters or connection strings. See [ADR-033](adr/adr-033-sanitize-telemetry-metadata-pii-redaction-scope.md). |
 
 **Static Factory Members:**
 
 | Member | Description |
 |---|---|
-| `TransactionOptions.Default` | `ReadCommitted` isolation + `UseSavepoint` nesting. |
-| `TransactionOptions.Serializable` | `Serializable` isolation + defaults. |
+| `TransactionOptions.Default` | `ReadCommitted` isolation + `UseSavepoint` nesting. **Shared singleton — zero-allocation on repeated access.** |
+| `TransactionOptions.Serializable` | `Serializable` isolation + defaults. **Creates a new instance on each access.** |
 | `TransactionOptions.ReadOnlyMode` | `ReadOnly = true` + defaults. |
 | `TransactionOptions.WithTimeout(TimeSpan)` | Creates a new instance with the specified timeout. |
 
@@ -178,6 +199,7 @@ Specifies the isolation level for a transaction.
 
 | Value | Description |
 |---|---|
+| `Unspecified` | Specifies that an undetermined isolation level different from explicit levels is used. |
 | `ReadUncommitted` | Allows dirty reads. |
 | `ReadCommitted` | Prevents dirty reads; allows non-repeatable reads. **(Default)** |
 | `RepeatableRead` | Prevents dirty and non-repeatable reads. |
@@ -208,12 +230,14 @@ graph TD
     Ex["Exception (BCL)"]
     TEx["TransactionException : Exception\nBase for all transactional exceptions"]
     TCEx["TransactionCommitException : TransactionException\nIsAmbiguous : bool"]
+    TPCEx["TransactionPostCommitException : TransactionException\nDurable Commit + Hook Failure"]
     TREx["TransactionRollbackException : TransactionException"]
     TSEx["TransactionStateException : TransactionException"]
     TTEx["TransactionTimeoutException : TransactionException"]
 
     Ex --> TEx
     TEx --> TCEx
+    TEx --> TPCEx
     TEx --> TREx
     TEx --> TSEx
     TEx --> TTEx
@@ -223,9 +247,10 @@ graph TD
 |---|---|---|
 | `TransactionException` | Base class for all transaction-related exceptions. | — |
 | `TransactionCommitException` | Thrown when a commit fails or the outcome is ambiguous. | `IsAmbiguous : bool` — `true` if the database engine may have committed despite the client-side error. |
-| `TransactionRollbackException` | Thrown when a rollback operation fails. | — |
-| `TransactionStateException` | Thrown when an invalid state transition is attempted. | — |
-| `TransactionTimeoutException` | Thrown when a transaction exceeds its configured timeout. | — |
+| `TransactionPostCommitException` | Thrown when physical DB commit succeeded, but post-commit hooks failed. | `InnerException` |
+| `TransactionRollbackException` | Thrown when a rollback operation fails during teardown. | `InnerException` |
+| `TransactionStateException` | Thrown when an invalid state transition is attempted. | `ActualState : TransactionState`, `AttemptedOperation : string?` |
+| `TransactionTimeoutException` | Thrown when a transaction exceeds its configured timeout. | `Timeout : TimeSpan` |
 
 ---
 
@@ -260,15 +285,34 @@ A concrete `IDbConnectionFactory` implementation that wraps delegate-based conne
 
 ---
 
-### OpenTelemetry Instrumentation
+### `TransactionDiagnostics` (static class)
+
+**Namespace**: `EricksonLopez.Transaction.Diagnostics`
+
+Provides diagnostic, tracing, and metric instruments for transaction monitoring and OpenTelemetry integration.
 
 Source name and meter name: **`"EricksonLopez.Transaction"`**
 
 ```csharp
 builder.Services.AddOpenTelemetry()
-    .WithTracing(t => t.AddSource("EricksonLopez.Transaction"))
-    .WithMetrics(m => m.AddMeter("EricksonLopez.Transaction"));
+    .WithTracing(t => t.AddSource(TransactionDiagnostics.SourceName))
+    .WithMetrics(m => m.AddMeter(TransactionDiagnostics.SourceName));
 ```
+
+| Member | Type / Signature | Description |
+|---|---|---|
+| `SourceName` | `const string` | Activity source and meter identifier (`"EricksonLopez.Transaction"`). |
+| `Version` | `const string` | Semantic version of the instrumentation schema (`"2.0.0"`). |
+| `ActivitySource` | `ActivitySource` | Singleton tracing instrument for distributed trace spans. |
+| `Meter` | `Meter` | Singleton metrics instrument for throughput, durations, and savepoint metrics. |
+| `StartActivity` | `Activity? StartActivity(string name, Guid transactionId, TransactionIsolationLevel isolationLevel, string? transactionName = null)` | Starts a new tracing span populated with relational tags (`transaction.id`, `transaction.isolation_level`, `transaction.name`). |
+| `RecordStarted` | `void RecordStarted(TransactionIsolationLevel isolationLevel)` | Increments the `transactions.started` counter. |
+| `RecordCommitted` | `void RecordCommitted(TransactionIsolationLevel isolationLevel, double durationMs)` | Increments `transactions.committed` and records elapsed milliseconds in `transactions.duration`. |
+| `RecordRolledBack` | `void RecordRolledBack(TransactionIsolationLevel isolationLevel, double durationMs)` | Increments `transactions.rolled_back` and records elapsed milliseconds in `transactions.duration`. |
+| `RecordFailed` | `void RecordFailed(TransactionIsolationLevel isolationLevel, double durationMs, string? errorType)` | Increments `transactions.failed` with error classification and records duration in `transactions.duration`. |
+| `RecordSavepointCreated` | `void RecordSavepointCreated()` | Increments the `transactions.savepoints.created` counter. |
+| `RecordSavepointRolledBack` | `void RecordSavepointRolledBack()` | Increments the `transactions.savepoints.rolled_back` counter. |
+| `RecordSavepointReleased` | `void RecordSavepointReleased()` | Increments the `transactions.savepoints.released` counter. |
 
 **Registered Metric Instruments:**
 
@@ -389,18 +433,31 @@ In-memory implementation of `ITransactionContext`.
 
 Each dialect package provides a connection factory, an error classifier, and DI registration extensions.
 
-### Registration Pattern
+### Relational Connection Factories
 
-All provider packages expose DI extensions in the `Microsoft.Extensions.DependencyInjection` namespace:
+Each dialect package provides a dedicated `IDbConnectionFactory` implementation:
 
-| Package | DI Extension Method | Required Dependency |
+| Factory Class | Package | Namespace | Constructors & Lifecycle |
+|---|---|---|---|
+| `PostgreSqlConnectionFactory` | `EricksonLopez.Transaction.PostgreSql` | `EricksonLopez.Transaction.PostgreSql` | `(NpgsqlDataSource dataSource)`<br/>`(string connectionString)`<br/>Implements `IDbConnectionFactory`, `IAsyncDisposable`, `IDisposable`. |
+| `SqlServerConnectionFactory` | `EricksonLopez.Transaction.SqlServer` | `EricksonLopez.Transaction.SqlServer` | `(string connectionString)`<br/>Implements `IDbConnectionFactory`. |
+| `MySqlConnectionFactory` | `EricksonLopez.Transaction.MySql` | `EricksonLopez.Transaction.MySql` | `(string connectionString)`<br/>Implements `IDbConnectionFactory`. |
+| `MariaDbConnectionFactory` | `EricksonLopez.Transaction.MariaDb` | `EricksonLopez.Transaction.MariaDb` | `(string connectionString)`<br/>Implements `IDbConnectionFactory`. |
+| `OracleConnectionFactory` | `EricksonLopez.Transaction.Oracle` | `EricksonLopez.Transaction.Oracle` | `(string connectionString)`<br/>Implements `IDbConnectionFactory`. |
+| `SqliteConnectionFactory` | `EricksonLopez.Transaction.Sqlite` | `EricksonLopez.Transaction.Sqlite` | `(string connectionString)`<br/>Implements `IDbConnectionFactory`, `IDisposable`. |
+
+### Dependency Injection Registration Extensions
+
+All provider packages expose static extension methods in the `Microsoft.Extensions.DependencyInjection` namespace:
+
+| Extension Class | Method Signature | Description |
 |---|---|---|
-| `EricksonLopez.Transaction.PostgreSql` | `services.AddPostgreSqlTransaction(NpgsqlDataSource)` | `NpgsqlDataSource` (singleton) |
-| `EricksonLopez.Transaction.SqlServer` | `services.AddSqlServerTransaction(string connectionString)` | — |
-| `EricksonLopez.Transaction.MySql` | `services.AddMySqlTransaction(string connectionString)` | — |
-| `EricksonLopez.Transaction.MariaDb` | `services.AddMariaDbTransaction(string connectionString)` | — |
-| `EricksonLopez.Transaction.Oracle` | `services.AddOracleTransaction(string connectionString)` | — |
-| `EricksonLopez.Transaction.Sqlite` | `services.AddSqliteTransaction(string connectionString)` | — |
+| `PostgreSqlTransactionExtensions` | `AddPostgreSqlTransaction(this IServiceCollection services, NpgsqlDataSource dataSource)` | Registers `PostgreSqlConnectionFactory` and core transaction services. |
+| `SqlServerTransactionExtensions` | `AddSqlServerTransaction(this IServiceCollection services, string connectionString)` | Registers `SqlServerConnectionFactory` and core transaction services. |
+| `MySqlTransactionExtensions` | `AddMySqlTransaction(this IServiceCollection services, string connectionString)` | Registers `MySqlConnectionFactory` and core transaction services. |
+| `MariaDbTransactionExtensions` | `AddMariaDbTransaction(this IServiceCollection services, string connectionString)` | Registers `MariaDbConnectionFactory` and core transaction services. |
+| `OracleTransactionExtensions` | `AddOracleTransaction(this IServiceCollection services, string connectionString)` | Registers `OracleConnectionFactory` and core transaction services. |
+| `SqliteTransactionExtensions` | `AddSqliteTransaction(this IServiceCollection services, string connectionString)` | Registers `SqliteConnectionFactory` and core transaction services. |
 
 ### Error Classifier API
 
@@ -417,6 +474,108 @@ Each dialect package exposes a static error classifier:
 
 ---
 
+## Package: `EricksonLopez.Transaction.EntityFrameworkCore`
+
+Provides frictionless Entity Framework Core enlistment in the active database transaction.
+
+**Namespace**: `EricksonLopez.Transaction.EntityFrameworkCore`
+
+### `DbContextTransactionExtensions` (static class)
+
+| Method | Signature | Description |
+|---|---|---|
+| `UseTransactionAsync` | `Task UseTransactionAsync(this DbContext dbContext, ITransactionContext transactionContext, CancellationToken cancellationToken = default)` | Instructs the Entity Framework Core `DbContext` to join the underlying `DbTransaction` managed by `ITransactionContext`. |
+
+---
+
+## Package: `EricksonLopez.Transaction.Mediator`
+
+Pipeline behaviors and marker contracts for automatic transactional command boundaries in mediator dispatch.
+
+**Namespace**: `EricksonLopez.Transaction.Mediator`
+
+### `ITransactionalCommand` (interface)
+
+Marker interface indicating that a command request must be executed within an automatic database transaction.
+
+### `ITransactionalCommandOptions` (interface)
+
+Interface allowing transactional commands to supply custom `TransactionOptions` (such as isolation level, timeout, and nesting behavior) in a trimming-safe, AOT-compatible manner without reflection.
+
+| Property | Type | Description |
+|---|---|---|
+| `TransactionOptions` | `TransactionOptions { get; }` | Gets the transaction configuration options for this command. |
+
+### `TransactionPipelineBehavior<TRequest, TResponse>` (sealed class)
+
+Open-generic pipeline behavior that executes mediator commands within an automatic database transaction boundary.
+- Automatically commits when the handler returns or on `Result.IsSuccess`.
+- Automatically rolls back when an unhandled exception is thrown or when `IResultOutcome.IsFailure` is returned.
+- Enlists all registered `ITransactionEnlistment` instances.
+
+```csharp
+public sealed class TransactionPipelineBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : ITransactionalCommand
+```
+
+| Member | Signature | Description |
+|---|---|---|
+| `Handle` | `ValueTask<TResponse> Handle<TNext>(TRequest request, TNext next, CancellationToken cancellationToken)` | Executes the pipeline behavior. |
+
+### `TransactionMediatorServiceCollectionExtensions` (static class)
+
+| Method | Signature | Description |
+|---|---|---|
+| `AddTransactionPipelineBehavior` | `IServiceCollection AddTransactionPipelineBehavior(this IServiceCollection services)` | Registers `TransactionPipelineBehavior<,>` as an open-generic transient pipeline behavior in the DI container. |
+
+### `TransactionalAttribute` (sealed class)
+
+Declarative attribute for specifying transaction isolation level and timeout on mediator command types. The `TransactionPipelineBehavior` reads this attribute at runtime via reflection.
+
+> [!NOTE]
+> For Native AOT scenarios where reflection is restricted, implement `ITransactionalCommandOptions` on the command record instead. Both approaches configure `TransactionOptions` for the pipeline behavior; `ITransactionalCommandOptions` is trimming-safe and supports per-instance configuration.
+
+```csharp
+[Transactional(TransactionIsolationLevel.Serializable, TimeoutSeconds = 30)]
+public sealed record PlaceOrderCommand : ITransactionalCommand { }
+```
+
+| Property | Type | Description |
+|---|---|---|
+| `IsolationLevel` | `TransactionIsolationLevel` | Requested transaction isolation level. |
+| `TimeoutSeconds` | `int` | Transaction timeout in seconds. |
+
+---
+
+## Package: `EricksonLopez.Transaction.Resilience`
+
+Polly integration extensions for transaction resilience and commit ambiguity handling.
+
+**Namespace**: `EricksonLopez.Transaction.Resilience`
+
+### `PollyTransactionExtensions` (static class)
+
+| Method | Signature | Description |
+|---|---|---|
+| `HandleAmbiguousCommit` | `PolicyBuilder HandleAmbiguousCommit(this PolicyBuilder policyBuilder)` | Extends a Polly `PolicyBuilder` to handle `TransactionCommitException` where `IsAmbiguous == true`. |
+| `HandleAmbiguousCommit` | `PolicyBuilder HandleAmbiguousCommit()` | Creates a base Polly `PolicyBuilder` configured specifically to intercept ambiguous commit exceptions. |
+
+---
+
+## Package: `EricksonLopez.Transaction.Analyzers`
+
+Roslyn diagnostic analyzer enforcing static safety and architectural boundaries on transaction primitives.
+
+**Namespace**: `EricksonLopez.Transaction.Analyzers`
+
+### `ConnectionManipulationAnalyzer` (class)
+
+- **Diagnostic ID**: `ELT001`
+- **Severity**: Error
+- **Description**: Prevents manual invocation of `Close()`, `Dispose()`, `DisposeAsync()`, `ChangeDatabase()`, `BeginTransaction()`, or `BeginTransactionAsync()` on `context.Connection`. Mutating connection lifecycle manually corrupts the `TransactionManager` state machine.
+
+---
+
 ## Compatibility Matrix
 
 | Package | net8.0 | net9.0 | net10.0 | Native AOT | Trimming Safe |
@@ -424,13 +583,18 @@ Each dialect package exposes a static error classifier:
 | `EricksonLopez.Transaction.Abstractions` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `EricksonLopez.Transaction` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `EricksonLopez.Transaction.Dapper` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `EricksonLopez.Transaction.EntityFrameworkCore` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `EricksonLopez.Transaction.Mediator` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `EricksonLopez.Transaction.Resilience` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `EricksonLopez.Transaction.Result` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `EricksonLopez.Transaction.Testing` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `EricksonLopez.Transaction.Analyzers` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `EricksonLopez.Transaction.PostgreSql` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `EricksonLopez.Transaction.SqlServer` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `EricksonLopez.Transaction.MySql` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `EricksonLopez.Transaction.MariaDb` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `EricksonLopez.Transaction.Oracle` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `EricksonLopez.Transaction.Sqlite` | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `EricksonLopez.Transaction.Result` | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `EricksonLopez.Transaction.Testing` | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 > All packages enforce `<IsAotCompatible>true</IsAotCompatible>` and `<EnableTrimAnalyzer>true</EnableTrimAnalyzer>` via `Directory.Build.props`. AOT compatibility is validated by the `EricksonLopez.Transaction.AotSmokeTest` binary executed in the CI pipeline (`aot-smoke-test.yml`).
+

@@ -7,7 +7,7 @@
     <AssemblyName>EricksonLopez.Transaction.Dapper</AssemblyName>
     <Description>Dapper integration and high-performance CommandDefinition extensions for EricksonLopez.Transaction.</Description>
     <PackageId>EricksonLopez.Transaction.Dapper</PackageId>
-    <PackageTags>$(CommonPackageTags);dapper;micro-orm;query-execution;command-definition;sql;data-access</PackageTags>
+    <PackageTags>$(CommonPackageTags);dapper;micro-orm;command-definition;data-access;native-aot</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

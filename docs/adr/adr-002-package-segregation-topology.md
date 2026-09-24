@@ -3,6 +3,9 @@
 ## Status
 Accepted
 
+## Date
+2026-09-04
+
 ## Context
 A monolithic transaction library introduces unwanted dependencies (such as Dapper, Npgsql, or Result types) into core application layers that may only require pure transaction contracts. Conversely, splitting packages too finely introduces maintenance friction and version skew.
 

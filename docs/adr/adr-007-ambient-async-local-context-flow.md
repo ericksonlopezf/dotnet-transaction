@@ -3,6 +3,9 @@
 ## Status
 Accepted
 
+## Date
+2026-09-04
+
 ## Context
 When orchestrating complex domain use cases, passing `ITransactionContext` explicitly as an argument through every repository method and intermediate service can create signature pollution across the domain and application layers. Conversely, relying purely on unmanaged globals causes cross-thread race conditions and leaking transactions across concurrent requests.
 

@@ -75,11 +75,11 @@ public sealed class Level2_Configuration : ILevel
         Console.WriteLine("  [C] AddTransaction(Func<IServiceProvider, IDbConnectionFactory>)  -> Registered OK");
 
         // Overload D: Generic type parameter (AddTransaction<TConnectionFactory>())
-        // NOTE: Requires a concrete class implementing IDbConnectionFactory registered as a type.
-        // Demonstrated as documentation reference — requires a named factory class.
-        Console.WriteLine("  [D] AddTransaction<TConnectionFactory>() — registers a typed IDbConnectionFactory");
-        Console.WriteLine("      Example: services.AddTransaction<MyCustomConnectionFactory>()");
-        Console.WriteLine("      Requires: MyCustomConnectionFactory : IDbConnectionFactory with public constructor\n");
+        var services4 = new ServiceCollection();
+        services4.AddTransaction<SampleCustomConnectionFactory>();
+        using ServiceProvider provider4 = services4.BuildServiceProvider();
+        ITransactionManager txManager4 = provider4.GetRequiredService<ITransactionManager>();
+        Console.WriteLine("  [D] AddTransaction<SampleCustomConnectionFactory>()              -> Registered & Resolved OK\n");
 
         // Use provider1 for the rest of this level
         ITransactionManager transactionManager = txManager1;
@@ -100,7 +100,8 @@ public sealed class Level2_Configuration : ILevel
             Timeout = TimeSpan.FromSeconds(10),
             ReadOnly = false,
             NestedBehavior = NestedTransactionBehavior.UseSavepoint,
-            TransactionName = "OrderProcessingPipeline"
+            TransactionName = "OrderProcessingPipeline",
+            SanitizeTelemetryMetadata = true
         };
 
         Console.WriteLine("[3] Executing with Custom TransactionOptions (Serializable + Named):");
@@ -152,5 +153,18 @@ public sealed class Level2_Configuration : ILevel
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("\n✔ Level 02 Configuration demonstration verified successfully.\n");
         Console.ResetColor();
+    }
+}
+
+public sealed class SampleCustomConnectionFactory : IDbConnectionFactory
+{
+    public DbConnection CreateConnection() =>
+        new SqliteConnection("Data Source=configuration;Mode=Memory;Cache=Shared");
+
+    public async ValueTask<DbConnection> CreateConnectionAsync(CancellationToken cancellationToken = default)
+    {
+        var conn = new SqliteConnection("Data Source=configuration;Mode=Memory;Cache=Shared");
+        await conn.OpenAsync(cancellationToken);
+        return conn;
     }
 }

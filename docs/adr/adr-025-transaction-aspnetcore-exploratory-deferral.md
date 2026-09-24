@@ -3,6 +3,9 @@
 ## Status
 Accepted (Exploratory — Deferred Pending Demand Validation)
 
+## Date
+2026-09-04
+
 ## Context
 A proposed `EricksonLopez.Transaction.AspNetCore` package would provide ASP.NET Core middleware and controller attribute support for automatic per-request transaction management:
 

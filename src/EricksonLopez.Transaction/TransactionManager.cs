@@ -27,25 +27,30 @@ namespace EricksonLopez.Transaction;
 public sealed partial class TransactionManager : ITransactionManager
 {
     private static readonly AsyncLocal<ITransactionContext?> AmbientContextHolder = new();
+    internal static readonly AsyncLocal<bool> IsSuppressedHolder = new();
     private readonly IDbConnectionFactory _connectionFactory;
     private readonly ILogger<TransactionManager>? _logger;
+    private readonly System.Collections.Generic.IEnumerable<IDatabaseDialect>? _dialects;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TransactionManager"/> class with the specified connection factory.
     /// </summary>
     /// <param name="connectionFactory">The database connection factory used to create database connections.</param>
     /// <param name="logger">An optional logger instance for diagnostic reporting.</param>
+    /// <param name="dialects">An optional collection of database dialects to use for provider-specific SQL generation.</param>
     /// <exception cref="ArgumentNullException"><paramref name="connectionFactory"/> is <see langword="null"/></exception>
     public TransactionManager(
         IDbConnectionFactory connectionFactory,
-        ILogger<TransactionManager>? logger = null)
+        ILogger<TransactionManager>? logger = null,
+        System.Collections.Generic.IEnumerable<IDatabaseDialect>? dialects = null)
     {
         _connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
         _logger = logger;
+        _dialects = dialects;
     }
 
     /// <inheritdoc/>
-    public ITransactionContext? CurrentContext => AmbientContextHolder.Value;
+    public ITransactionContext? CurrentContext => IsSuppressedHolder.Value ? null : AmbientContextHolder.Value;
 
     /// <inheritdoc/>
     public Task<ITransaction> BeginAsync(
@@ -62,7 +67,10 @@ public sealed partial class TransactionManager : ITransactionManager
                 Log.SuppressedScopeBeginning(_logger);
             }
 
-            ITransaction suppressedScope = new SuppressedTransactionScope(current, AmbientContextHolder);
+            ITransaction suppressedScope = new SuppressedTransactionScope(
+                current,
+                AmbientContextHolder,
+                null);
             return Task.FromResult(suppressedScope);
         }
 
@@ -149,10 +157,19 @@ public sealed partial class TransactionManager : ITransactionManager
             combinedToken = linkedCts.Token;
         }
 
+        bool wasSuppressed = effectiveOptions.NestedBehavior == NestedTransactionBehavior.Suppress;
+        bool previousSuppressed = IsSuppressedHolder.Value;
+        ITransactionContext? previousAmbient = AmbientContextHolder.Value;
+
         try
         {
             await using ITransaction transaction = await BeginAsync(effectiveOptions, combinedToken).ConfigureAwait(false);
-            if (effectiveOptions.NestedBehavior != NestedTransactionBehavior.Suppress)
+            if (wasSuppressed)
+            {
+                AmbientContextHolder.Value = null;
+                IsSuppressedHolder.Value = true;
+            }
+            else
             {
                 AmbientContextHolder.Value = transaction.Context;
             }
@@ -168,6 +185,14 @@ public sealed partial class TransactionManager : ITransactionManager
             }
 
             throw new TransactionTimeoutException(effectiveOptions.Timeout!.Value);
+        }
+        finally
+        {
+            if (wasSuppressed)
+            {
+                IsSuppressedHolder.Value = previousSuppressed;
+                AmbientContextHolder.Value = previousAmbient;
+            }
         }
     }
 
@@ -241,10 +266,19 @@ public sealed partial class TransactionManager : ITransactionManager
             combinedToken = linkedCts.Token;
         }
 
+        bool wasSuppressed = effectiveOptions.NestedBehavior == NestedTransactionBehavior.Suppress;
+        bool previousSuppressed = IsSuppressedHolder.Value;
+        ITransactionContext? previousAmbient = AmbientContextHolder.Value;
+
         try
         {
             await using ITransaction transaction = await BeginAsync(effectiveOptions, combinedToken).ConfigureAwait(false);
-            if (effectiveOptions.NestedBehavior != NestedTransactionBehavior.Suppress)
+            if (wasSuppressed)
+            {
+                AmbientContextHolder.Value = null;
+                IsSuppressedHolder.Value = true;
+            }
+            else
             {
                 AmbientContextHolder.Value = transaction.Context;
             }
@@ -262,6 +296,14 @@ public sealed partial class TransactionManager : ITransactionManager
 
             throw new TransactionTimeoutException(effectiveOptions.Timeout!.Value);
         }
+        finally
+        {
+            if (wasSuppressed)
+            {
+                IsSuppressedHolder.Value = previousSuppressed;
+                AmbientContextHolder.Value = previousAmbient;
+            }
+        }
     }
 
     private async Task<ITransaction> CreatePhysicalTransactionScopeAsync(
@@ -277,9 +319,11 @@ public sealed partial class TransactionManager : ITransactionManager
         System.Data.IsolationLevel systemIsolation = IsolationLevelConverter.ToSystemIsolationLevel(options.IsolationLevel);
         DbTransaction dbTx = await connection.BeginTransactionAsync(systemIsolation, cancellationToken).ConfigureAwait(false);
 
+        IDatabaseDialect dialect = EricksonLopez.Transaction.Dialects.DialectResolver.Resolve(connection, _dialects);
+
         if (options.ReadOnly)
         {
-            await ApplyReadOnlyModeAsync(connection, dbTx, cancellationToken).ConfigureAwait(false);
+            await dialect.ApplyReadOnlyModeAsync(connection, dbTx, cancellationToken).ConfigureAwait(false);
         }
 
         var stateMachine = new TransactionStateMachine(TransactionState.Active);
@@ -287,8 +331,9 @@ public sealed partial class TransactionManager : ITransactionManager
             Guid.NewGuid(),
             connection,
             dbTx,
-            options.IsolationLevel,
+            isolationLevel: options.IsolationLevel,
             stateMachine,
+            dialect,
             cancellationToken);
 
         var physicalTx = new PhysicalTransaction(
@@ -297,9 +342,16 @@ public sealed partial class TransactionManager : ITransactionManager
             connection,
             dbTx,
             ownsConnection: true,
-            transactionName: options.TransactionName);
+            transactionName: options.TransactionName,
+            sanitizeTelemetryMetadata: options.SanitizeTelemetryMetadata);
 
-        return new AmbientTransactionScope(physicalTx, CurrentContext, AmbientContextHolder);
+        ITransactionContext? previousAmbient = AmbientContextHolder.Value;
+
+        return new AmbientTransactionScope(
+            physicalTx,
+            previousAmbient,
+            AmbientContextHolder,
+            null);
     }
 
     private static async Task<ITransaction> CreateSavepointScopeAsync(
@@ -307,41 +359,17 @@ public sealed partial class TransactionManager : ITransactionManager
         TransactionOptions options,
         CancellationToken cancellationToken)
     {
-        string savepointName = options.TransactionName ?? $"sp_{Guid.NewGuid():N}";
+        string savepointName = options.TransactionName ?? $"sp_{Guid.NewGuid():N}"[..24];
         ISavepoint savepoint = await currentContext.CreateSavepointAsync(savepointName, cancellationToken).ConfigureAwait(false);
         var savepointScope = new SavepointTransactionScope(currentContext, savepoint);
-        return new AmbientTransactionScope(savepointScope, currentContext, AmbientContextHolder);
+        return new AmbientTransactionScope(
+            savepointScope,
+            currentContext,
+            AmbientContextHolder,
+            null);
     }
 
-    private static async Task ApplyReadOnlyModeAsync(
-        DbConnection connection,
-        DbTransaction transaction,
-        CancellationToken cancellationToken)
-    {
-        string connectionTypeName = connection.GetType().Name;
-        // PostgreSQL: enforce transaction-level read-only mode via SQL statement
-        if (connectionTypeName.Contains("Npgsql", StringComparison.OrdinalIgnoreCase))
-        {
-            await using DbCommand cmd = connection.CreateCommand();
-            cmd.Transaction = transaction;
-            cmd.CommandText = "SET TRANSACTION READ ONLY;";
-            await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-        }
-        else if (connectionTypeName.Contains("MySql", StringComparison.OrdinalIgnoreCase))
-        {
-            try
-            {
-                await using DbCommand cmd = connection.CreateCommand();
-                cmd.Transaction = transaction;
-                cmd.CommandText = "SET TRANSACTION READ ONLY;";
-                await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-            }
-            catch
-            {
-                // Silently ignore if not supported by driver in current state
-            }
-        }
-    }
+
 
     private static partial class Log
     {

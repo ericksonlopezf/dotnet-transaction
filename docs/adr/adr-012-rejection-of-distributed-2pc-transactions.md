@@ -3,6 +3,9 @@
 ## Status
 Accepted (Rejection)
 
+## Date
+2026-09-04
+
 ## Context
 Legacy .NET applications frequently used `System.Transactions.TransactionScope` and Microsoft Distributed Transaction Coordinator (MSDTC) to achieve distributed atomicity across multiple databases or message queues (e.g. SQL Server + MSMQ + Oracle).
 

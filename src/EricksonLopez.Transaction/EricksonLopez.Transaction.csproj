@@ -7,7 +7,7 @@
     <AssemblyName>EricksonLopez.Transaction</AssemblyName>
     <Description>Native AOT-ready enterprise transaction manager, ambient scope coordinator, state machine, and OpenTelemetry instrumentation for modern .NET.</Description>
     <PackageId>EricksonLopez.Transaction</PackageId>
-    <PackageTags>$(CommonPackageTags);transaction-manager;transaction-scope;ambient-context;savepoints;nested-transactions;opentelemetry;observability;dependency-injection</PackageTags>
+    <PackageTags>$(CommonPackageTags);transaction-manager;transaction-scope;ambient-context;savepoint;nested-transaction;opentelemetry;observability;dependency-injection;native-aot</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
@@ -36,6 +36,7 @@
     <InternalsVisibleTo Include="EricksonLopez.Transaction.IntegrationTests" />
     <InternalsVisibleTo Include="EricksonLopez.Transaction.Testing" />
     <InternalsVisibleTo Include="EricksonLopez.Transaction.Benchmarks" />
+    <InternalsVisibleTo Include="EricksonLopez.Transaction.AuditTests" />
   </ItemGroup>
 
 </Project>

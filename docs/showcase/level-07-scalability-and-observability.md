@@ -38,8 +38,8 @@ await Task.WhenAll(tasks);
 ## 2. Built-in OpenTelemetry Diagnostic Instruments
 
 The [`TransactionDiagnostics`](file:///d:/DevData/ericksonlopez.dev/dotnet-transaction/src/EricksonLopez.Transaction/Diagnostics/TransactionDiagnostics.cs) class provides first-class distributed tracing and metrics:
-- **ActivitySource**: `"EricksonLopez.Transaction"` (v1.0.0)
-- **Meter**: `"EricksonLopez.Transaction"` (v1.0.0)
+- **ActivitySource**: `"EricksonLopez.Transaction"` (v2.0.0)
+- **Meter**: `"EricksonLopez.Transaction"` (v2.0.0)
 
 ### Telemetry Metrics
 

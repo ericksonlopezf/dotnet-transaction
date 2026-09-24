@@ -68,10 +68,10 @@ dotnet stryker --config-file stryker-core-config.json
 # Run for a specific dialect package (e.g., PostgreSql)
 dotnet stryker --config-file stryker-postgresql-config.json
 
-# The CI pipeline runs all 11 package-specific configs in a matrix job
+# The CI pipeline runs all 15 package-specific configs in a matrix job
 ```
 
-Available Stryker config files: `stryker-config.json` (root fallback), `stryker-core-config.json`, `stryker-abstractions-config.json`, `stryker-dapper-config.json`, `stryker-postgresql-config.json`, `stryker-sqlserver-config.json`, `stryker-mysql-config.json`, `stryker-mariadb-config.json`, `stryker-oracle-config.json`, `stryker-sqlite-config.json`, `stryker-result-config.json`, `stryker-testing-config.json`.
+Available Stryker config files: `stryker-core-config.json`, `stryker-abstractions-config.json`, `stryker-analyzers-config.json`, `stryker-dapper-config.json`, `stryker-efcore-config.json`, `stryker-mariadb-config.json`, `stryker-mediator-config.json`, `stryker-mysql-config.json`, `stryker-oracle-config.json`, `stryker-postgresql-config.json`, `stryker-resilience-config.json`, `stryker-result-config.json`, `stryker-sqlite-config.json`, `stryker-sqlserver-config.json`, `stryker-testing-config.json`.
 
 ### 4. Run Benchmarks
 

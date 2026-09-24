@@ -3,6 +3,9 @@
 ## Status
 Accepted (Rejection)
 
+## Date
+2026-09-04
+
 ## Context
 During product strategy analysis and competitive feature matrix review, several ergonomic convenience features were proposed that might superficially improve developer experience but provide no architectural value and actively regress the library's design invariants.
 

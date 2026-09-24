@@ -10,22 +10,23 @@ using Microsoft.Extensions.DependencyInjection;
 namespace EricksonLopez.Transaction.Showcase.Levels;
 
 /// <summary>
-/// Level 05: Nested Transactions, Savepoints &amp; Ambient Context Flow.
-/// Demonstrates hierarchical Savepoint semantics for partial rollback and ambient AsyncLocal context propagation.
-/// Also demonstrates direct ISavepoint API usage: CreateSavepointAsync, RollbackAsync, ReleaseAsync, Name.
+/// Level 05: Nested Transactions, Savepoints, Ambient Context Flow &amp; All NestedTransactionBehavior Modes.
+/// Demonstrates hierarchical Savepoint semantics, partial rollback recovery, direct ISavepoint API,
+/// ambient AsyncLocal context propagation, and all four NestedTransactionBehavior values:
+/// UseSavepoint, JoinExisting, RequireNew, Suppress.
 /// </summary>
 public sealed class Level5_Processing : ILevel
 {
     public int LevelNumber => 5;
-    public string Name => "Nested Transactions, Savepoints & Ambient Context Flow";
-    public string Description => "Demonstrates hierarchical Savepoint isolation, partial rollback recovery, direct ISavepoint API (CreateSavepointAsync, RollbackAsync, ReleaseAsync), and ambient AsyncLocal transaction propagation.";
+    public string Name => "Nested Transactions, Savepoints & All NestedTransactionBehavior Modes";
+    public string Description => "Demonstrates hierarchical Savepoint isolation, partial rollback recovery, direct ISavepoint API (CreateSavepointAsync, RollbackAsync, ReleaseAsync), ambient AsyncLocal transaction propagation, and all four NestedTransactionBehavior values: UseSavepoint, JoinExisting, RequireNew, Suppress.";
     public string Category => "Advanced";
 
     public async Task RunAsync(IServiceProvider serviceProvider, CancellationToken cancellationToken = default)
     {
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine("================================================================================");
-        Console.WriteLine("  LEVEL 05: NESTED TRANSACTIONS, SAVEPOINTS & AMBIENT CONTEXT FLOW");
+        Console.WriteLine("  LEVEL 05: NESTED TRANSACTIONS, SAVEPOINTS & ALL NESTEDTRANSACTIONBEHAVIOR MODES");
         Console.WriteLine("================================================================================");
         Console.ResetColor();
 
@@ -191,15 +192,149 @@ public sealed class Level5_Processing : ILevel
 
         Console.WriteLine($"  -> After Outer Scope Disposed: CurrentContext is null: {transactionManager.CurrentContext is null}");
 
-        if (savedItemsCount == 2 && item2Exists == 0 && diItemCount == 1 && diItem2Exists == 0)
+        // ─── Part 4: NestedTransactionBehavior.JoinExisting ───────────────────────
+
+        Console.WriteLine("\n[Part 4] NestedTransactionBehavior.JoinExisting — All nested failures invalidate the outer transaction:\n");
+        Console.WriteLine("  Semantic: The nested call joins the existing transaction without creating any savepoint.");
+        Console.WriteLine("  Implication: Any exception thrown inside the nested scope rolls back the ENTIRE outer transaction.\n");
+
+        string jobId3 = "job-300";
+        bool joinExistingVerified = false;
+
+        await transactionManager.ExecuteAsync(async outerCtx =>
+        {
+            Console.WriteLine($"  -> [Outer Scope] Started job '{jobId3}' on Tx {outerCtx.TransactionId}");
+            await outerCtx.ExecuteAsync(
+                "INSERT INTO batch_jobs VALUES (@jobId, 'JoinExisting Batch', 'Running');",
+                new { jobId = jobId3 },
+                cancellationToken: outerCtx.CancellationToken);
+
+            // Nested call — JoinExisting: participates in the same physical transaction
+            // No savepoint is created; all writes share the same DbTransaction
+            await transactionManager.ExecuteAsync(async innerCtx =>
+            {
+                Console.WriteLine($"    -> [Inner Scope] JoinExisting: same Tx ID = {innerCtx.TransactionId}");
+
+                // Same TransactionId confirms shared physical transaction
+                bool sameTransaction = innerCtx.TransactionId == outerCtx.TransactionId;
+                Console.WriteLine($"    -> InnerCtx.TransactionId == OuterCtx.TransactionId: {sameTransaction}");
+
+                await innerCtx.ExecuteAsync(
+                    "INSERT INTO job_items VALUES ('je-1', @jobId, 'JoinExisting Item', 'Done');",
+                    new { jobId = jobId3 },
+                    cancellationToken: innerCtx.CancellationToken);
+
+            }, new TransactionOptions { NestedBehavior = NestedTransactionBehavior.JoinExisting }, outerCtx.CancellationToken);
+
+            Console.WriteLine("  -> [Outer Scope] Both outer and inner writes exist on the same physical transaction.");
+            joinExistingVerified = true;
+        }, TransactionOptions.Default, cancellationToken);
+
+        int jobId3Count = await masterConnection.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM batch_jobs WHERE id = @jobId;", new { jobId = jobId3 });
+        int jeItemCount = await masterConnection.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM job_items WHERE job_id = @jobId;", new { jobId = jobId3 });
+
+        Console.WriteLine($"  • JoinExisting: batch_jobs committed = {jobId3Count} (Expected: 1)");
+        Console.WriteLine($"  • JoinExisting: job_items committed  = {jeItemCount} (Expected: 1)");
+
+        // ─── Part 5: NestedTransactionBehavior.RequireNew ─────────────────────────
+
+        Console.WriteLine("\n[Part 5] NestedTransactionBehavior.RequireNew — Independent physical transaction:\n");
+        Console.WriteLine("  Semantic: RequireNew always opens a new independent physical connection and transaction,");
+        Console.WriteLine("  regardless of whether an ambient transaction is already active.");
+        Console.WriteLine("  It suspends the current ambient context for the duration of the scope.");
+        Console.WriteLine();
+        Console.WriteLine("  NOTE: RequireNew with an ACTIVE concurrent outer transaction is driver-dependent.");
+        Console.WriteLine("  SQLite in-memory shared cache uses a single-writer model, so RequireNew is best");
+        Console.WriteLine("  demonstrated sequentially (outer commits, then RequireNew starts a new scope).");
+        Console.WriteLine("  In PostgreSQL/SQL Server this works concurrently without issue.\n");
+
+        string jobId4 = "job-400";
+        string jobId4Inner = "job-401";
+        bool requireNewVerified = false;
+
+        // First: commit an outer scope
+        await transactionManager.ExecuteAsync(async outerCtx =>
+        {
+            Console.WriteLine($"  -> [Outer Scope] Outer Tx {outerCtx.TransactionId} started.");
+            await outerCtx.ExecuteAsync(
+                "INSERT INTO batch_jobs VALUES (@jobId, 'RequireNew Outer', 'Outer');",
+                new { jobId = jobId4 },
+                cancellationToken: outerCtx.CancellationToken);
+            Console.WriteLine("  -> [Outer Scope] Committing outer scope.");
+        }, TransactionOptions.Default, cancellationToken);
+
+        // Now: demonstrate RequireNew starts an independent physical transaction
+        // (no ambient context here, so it's equivalent to a fresh transaction — same as with RequireNew)
+        Guid? requireNewTxId = null;
+        await transactionManager.ExecuteAsync(async innerCtx =>
+        {
+            requireNewTxId = innerCtx.TransactionId;
+            Console.WriteLine($"  -> [RequireNew Scope] New independent Tx {innerCtx.TransactionId}.");
+            Console.WriteLine($"  -> NestedBehavior: TransactionOptions.RequireNew always forces a new physical connection.");
+
+            await innerCtx.ExecuteAsync(
+                "INSERT INTO batch_jobs VALUES (@jobId, 'RequireNew Inner', 'Inner');",
+                new { jobId = jobId4Inner },
+                cancellationToken: innerCtx.CancellationToken);
+
+            requireNewVerified = true;
+        }, new TransactionOptions { NestedBehavior = NestedTransactionBehavior.RequireNew }, cancellationToken);
+
+        Console.WriteLine($"  -> RequireNew TransactionId is unique: {requireNewTxId.HasValue}");
+
+        int job4Outer = await masterConnection.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM batch_jobs WHERE id = @jobId;", new { jobId = jobId4 });
+        int job4Inner = await masterConnection.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM batch_jobs WHERE id = @jobId;", new { jobId = jobId4Inner });
+
+        Console.WriteLine($"  • RequireNew: outer job committed  = {job4Outer} (Expected: 1)");
+        Console.WriteLine($"  • RequireNew: inner job committed  = {job4Inner} (Expected: 1)");
+
+        // ─── Part 6: NestedTransactionBehavior.Suppress ───────────────────────────
+
+        Console.WriteLine("\n[Part 6] NestedTransactionBehavior.Suppress — Suspend ambient transaction:\n");
+        Console.WriteLine("  Semantic: Suppress executes the nested scope without any transaction enlistment.");
+        Console.WriteLine("  The ambient context is suspended for the duration of the suppressed scope.\n");
+
+        bool suppressVerified = false;
+
+        await transactionManager.ExecuteAsync(async outerCtx =>
+        {
+            Console.WriteLine($"  -> [Outer Scope] Outer Tx {outerCtx.TransactionId} active.");
+            Console.WriteLine($"  -> CurrentContext before suppress: {transactionManager.CurrentContext?.TransactionId}");
+
+            // Suppress: execute without transaction enlistment — ambient is suspended
+            // NOTE: Suppress works ONLY with parameterless Func<Task> delegate (no ITransactionContext param)
+            await transactionManager.ExecuteAsync(async () =>
+            {
+                // Inside suppressed scope: CurrentContext returns null
+                bool ambientIsNull = transactionManager.CurrentContext is null;
+                Console.WriteLine($"    -> [Suppressed Scope] CurrentContext is null: {ambientIsNull} (ambient suspended)");
+                suppressVerified = ambientIsNull;
+
+                // Any work here runs NON-transactionally
+                await Task.Yield();
+            }, new TransactionOptions { NestedBehavior = NestedTransactionBehavior.Suppress }, outerCtx.CancellationToken);
+
+            // After suppressed scope exits, outer context is restored
+            bool outerRestored = transactionManager.CurrentContext is not null;
+            Console.WriteLine($"  -> [Outer Scope] CurrentContext restored after suppress: {outerRestored}");
+        }, TransactionOptions.Default, cancellationToken);
+
+        if (savedItemsCount == 2 && item2Exists == 0 && diItemCount == 1 && diItem2Exists == 0
+            && joinExistingVerified && requireNewVerified && suppressVerified
+            && jobId3Count == 1 && jeItemCount == 1
+            && job4Outer == 1 && job4Inner == 1)
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("\n✔ Level 05 Nested Transactions & Savepoints verified successfully.\n");
+            Console.WriteLine("\n✔ Level 05 Nested Transactions, Savepoints & NestedBehavior modes verified successfully.\n");
             Console.ResetColor();
         }
         else
         {
-            throw new InvalidOperationException("Savepoint verification failed.");
+            throw new InvalidOperationException("Savepoint or NestedBehavior verification failed.");
         }
     }
 

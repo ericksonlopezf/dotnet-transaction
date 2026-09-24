@@ -7,7 +7,7 @@
     <AssemblyName>EricksonLopez.Transaction.Oracle</AssemblyName>
     <Description>Oracle Database connection factory, transaction extensions, and Oracle error code classifier for EricksonLopez.Transaction using Oracle.ManagedDataAccess.Core.</Description>
     <PackageId>EricksonLopez.Transaction.Oracle</PackageId>
-    <PackageTags>$(CommonPackageTags);oracle;oracledb;oracle-manageddataaccess;savepoints;deadlock-detection;database-provider</PackageTags>
+    <PackageTags>$(CommonPackageTags);oracle;oracle-database;odp-net;savepoint;deadlock-detection;database-provider;native-aot</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,0 +1,23 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net10.0</TargetFrameworks>
+    <RootNamespace>EricksonLopez.Transaction.Resilience</RootNamespace>
+    <AssemblyName>EricksonLopez.Transaction.Resilience</AssemblyName>
+    <Description>Polly resilience extensions for handling ambiguous transaction commits.</Description>
+    <PackageId>EricksonLopez.Transaction.Resilience</PackageId>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageTags>$(CommonPackageTags);polly;resilience;retry;transient-fault-handling;ambiguous-commit;native-aot</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EricksonLopez.Transaction.Abstractions\EricksonLopez.Transaction.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Polly" />
+  </ItemGroup>
+
+</Project>

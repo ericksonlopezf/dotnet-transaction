@@ -7,7 +7,7 @@
     <AssemblyName>EricksonLopez.Transaction.Sqlite</AssemblyName>
     <Description>SQLite connection factory, transaction extensions, and SQLite error code classifier for EricksonLopez.Transaction using Microsoft.Data.Sqlite.</Description>
     <PackageId>EricksonLopez.Transaction.Sqlite</PackageId>
-    <PackageTags>$(CommonPackageTags);sqlite;sqlite3;microsoft-data-sqlite;savepoints;wal-mode;deadlock-detection;database-provider</PackageTags>
+    <PackageTags>$(CommonPackageTags);sqlite;microsoft-data-sqlite;savepoint;wal-mode;deadlock-detection;database-provider;native-aot</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

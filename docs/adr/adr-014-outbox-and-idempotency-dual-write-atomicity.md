@@ -3,6 +3,9 @@
 ## Status
 Accepted
 
+## Date
+2026-09-04
+
 ## Context
 In microservices architecture, dual-write operations (e.g. updating an account balance AND publishing an `AccountUpdatedEvent` to a message broker, or recording an idempotency claim AND persisting business data) are vulnerable to split-brain failures when performed across uncoordinated boundaries.
 

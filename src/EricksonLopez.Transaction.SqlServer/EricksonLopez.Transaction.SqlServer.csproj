@@ -7,7 +7,7 @@
     <AssemblyName>EricksonLopez.Transaction.SqlServer</AssemblyName>
     <Description>Microsoft SQL Server connection factory, transaction extensions, and SQL Server error code classifier for EricksonLopez.Transaction.</Description>
     <PackageId>EricksonLopez.Transaction.SqlServer</PackageId>
-    <PackageTags>$(CommonPackageTags);sqlserver;mssql;sqlclient;savepoints;snapshot-isolation;deadlock-detection;database-provider</PackageTags>
+    <PackageTags>$(CommonPackageTags);sqlserver;mssql;sqlclient;savepoint;snapshot-isolation;deadlock-detection;database-provider;native-aot</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

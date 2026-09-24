@@ -17,15 +17,18 @@ namespace EricksonLopez.Transaction.Testing;
 public sealed class FakeTransaction : ITransaction
 {
     private readonly FakeTransactionContext _context;
+    private readonly Action? _onDisposed;
     private bool _disposed;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="FakeTransaction"/> class with an optional test context.
     /// </summary>
     /// <param name="context">The test transaction context to use, or <see langword="null"/> to create a new context.</param>
-    public FakeTransaction(FakeTransactionContext? context = null)
+    /// <param name="onDisposed">An optional callback invoked when the fake transaction is disposed.</param>
+    public FakeTransaction(FakeTransactionContext? context = null, Action? onDisposed = null)
     {
         _context = context ?? new FakeTransactionContext();
+        _onDisposed = onDisposed;
         TransactionId = _context.TransactionId;
     }
 
@@ -66,6 +69,8 @@ public sealed class FakeTransaction : ITransaction
     /// <inheritdoc/>
     public Task CommitAsync(CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
         CommitCount++;
         if (ExceptionToThrowOnCommit is not null)
         {
@@ -80,6 +85,8 @@ public sealed class FakeTransaction : ITransaction
     /// <inheritdoc/>
     public Task RollbackAsync(CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
         RollbackCount++;
         if (ExceptionToThrowOnRollback is not null)
         {
@@ -94,6 +101,7 @@ public sealed class FakeTransaction : ITransaction
     /// <inheritdoc/>
     public Task<ISavepoint> CreateSavepointAsync(string name, CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         return _context.CreateSavepointAsync(name, cancellationToken);
     }
 
@@ -103,6 +111,7 @@ public sealed class FakeTransaction : ITransaction
         if (!_disposed)
         {
             _disposed = true;
+            _onDisposed?.Invoke();
             if (_context.State == TransactionState.Active)
             {
                 _context.State = TransactionState.RolledBack;

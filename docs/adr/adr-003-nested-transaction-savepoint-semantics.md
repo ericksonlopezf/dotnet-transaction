@@ -3,6 +3,9 @@
 ## Status
 Accepted
 
+## Date
+2026-09-04
+
 ## Context
 Relational database engines (such as PostgreSQL, MySQL, SQLite, and SQL Server) do not support true physical nested transactions on a single `DbConnection`. In standard ADO.NET, calling `BeginTransactionAsync()` on an already active connection throws an `InvalidOperationException`.
 
@@ -13,7 +16,7 @@ We define 4 deterministic nested transaction behaviors via `NestedTransactionBeh
 
 ### 1. `NestedTransactionBehavior.UseSavepoint` (Default)
 When `BeginAsync` or `ExecuteAsync` is called while an active ambient transaction exists:
-- A uniquely named savepoint (`sp_{Guid}`) is created on the active physical transaction.
+- A uniquely named savepoint is created on the active physical transaction. The name is generated as `sp_` followed by the first 24 characters of a newly generated GUID in `N` format (lowercase hexadecimal, no hyphens), e.g., `sp_a1b2c3d4e5f6708192a3b4c5`. If `TransactionOptions.TransactionName` is specified, it is used directly as the savepoint name instead.
 - A `SavepointTransactionScope` is returned that controls the savepoint lifecycle.
 - If the nested scope completes and commits, the savepoint changes are retained in the outer transaction.
 - If the nested scope fails or rolls back, changes executed since the savepoint are rolled back (`ROLLBACK TO SAVEPOINT`), allowing the outer transaction to remain active and make recovery decisions.

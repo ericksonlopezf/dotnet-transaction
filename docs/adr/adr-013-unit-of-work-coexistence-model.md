@@ -3,6 +3,9 @@
 ## Status
 Accepted
 
+## Date
+2026-09-04
+
 ## Context
 In Domain-Driven Design (DDD) and Clean Architecture, two concepts often become conflated:
 1. **Unit of Work (UoW)**: A pattern from Martin Fowler for tracking aggregates modified during a business transaction and coordinating the writing out of changes and resolution of concurrency problems.
