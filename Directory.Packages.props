@@ -14,7 +14,7 @@
     <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.12" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
     <PackageVersion Include="OpenTelemetry.Api" Version="1.19.1" />
-    <PackageVersion Include="Polly" Version="8.8.0" />
+    <PackageVersion Include="Polly" Version="8.9.0" />
     <!-- Data & Providers -->
     <PackageVersion Include="Dapper" Version="2.1.89" />
     <PackageVersion Include="Npgsql" Version="10.0.3" />
